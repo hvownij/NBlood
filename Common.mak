@@ -404,6 +404,15 @@ ifneq (i386,$(strip $(IMPLICIT_ARCH)))
     override NOASM := 1
 endif
 
+ifeq ($(NORENDER),1)
+    override STARTUP_WINDOW := 0
+    override USE_OPENGL := 0
+    override HAVE_GTK2 := 0
+    override HAVE_VORBIS := 0
+    override HAVE_FLAC := 0
+    override HAVE_XMP := 0
+endif
+
 ifeq (0,$(USE_OPENGL))
     override POLYMER := 0
     override USE_LIBVPX := 0
@@ -865,6 +874,9 @@ ifneq (0,$(USE_OPENGL))
 endif
 ifneq (0,$(POLYMER))
     COMPILERFLAGS += -DPOLYMER
+endif
+ifneq (0,$(NORENDER))
+    COMPILERFLAGS += -DNORENDER
 endif
 
 

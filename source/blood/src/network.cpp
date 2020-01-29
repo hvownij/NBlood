@@ -26,6 +26,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #ifndef NETCODE_DISABLE
 #include "enet.h"
 #endif
+#ifdef NORENDER
+#include "blood.h"
+#endif
 #include "compat.h"
 #include "config.h"
 #include "controls.h"
@@ -69,6 +72,15 @@ int gNetPort = kNetDefaultPort;
 
 const short word_1328AC = 0x214;
 
+#ifdef NORENDER
+#ifdef _WIN32
+SOCKET supervisorSocket;
+#else
+int supervisorSocket;
+#endif
+struct sockaddr_in supervisorAddress;
+#endif
+
 PKT_STARTGAME gPacketStartGame;
 
 #ifndef NETCODE_DISABLE
@@ -103,6 +115,74 @@ struct PKT_CONNECTINFO {
     short connecthead;
     short connectpoint2[kMaxPlayers];
 };
+
+#ifdef NORENDER
+void sendpkt(char* data, int len)
+{
+    sendto(supervisorSocket,
+        data,
+        len,
+        0,
+        (struct sockaddr*) &supervisorAddress,
+        (int) sizeof(struct sockaddr_in));
+}
+
+void notifySupervisor(int isStarted)
+{
+    if (!supervisorSocket)
+        return;
+
+    const int dataLength = 13;
+    char message[dataLength];
+    sprintf(message, "A%i\t%i\t%i\t%i\0",
+        gNetPort,
+        isStarted,
+        numplayers,
+        gNetPlayers);
+
+    sendpkt((char*)&message, dataLength);
+
+    if (isStarted)
+    {
+        const int dataLength2 = 155;
+        char names[dataLength2];
+        memset(names, 0, dataLength2);
+        sprintf(names, "B%i\t", gNetPort);
+
+        const int dataLength3 = (kMaxPlayers+3)*sizeof(int);
+        int scores[kMaxPlayers+3];
+        memset(scores, 0, dataLength3);
+        scores[0] = (int)67; // C
+        scores[1] = gNetPort;
+        scores[2] = (int)gGameOptions.nGameType;
+
+        for (int i = 0, p = connecthead; p >= 0; i++, p = connectpoint2[p])
+        {
+            char* name = gProfile[p].name;
+            sprintf(names, "%s%s\t", names, name);
+            if (gGameOptions.nGameType != 3)
+                scores[i+3] = gPlayer[p].fragCount;
+            else
+                scores[i+3] = dword_21EFB0[gPlayer[p].teamId&1];
+        }
+
+        sendpkt((char*)&names, dataLength2);
+        sendpkt((char*)&scores, dataLength3);
+    }
+}
+
+void removeServer()
+{
+    if (!supervisorSocket)
+        return;
+
+    const int dataLength = 7;
+    char message[dataLength];
+    sprintf(message, "D%i\0", gNetPort);
+
+    sendpkt((char*)&message, dataLength);
+}
+#endif
 
 void netServerDisconnect(void)
 {
@@ -606,6 +686,9 @@ void netWaitForEveryone(char a1)
     int p;
     do
     {
+#ifdef NORENDER
+        SDL_Delay(10);
+#endif
         if (keystatus[sc_Escape] && a1)
             exit(0);
         gameHandleEvents();
@@ -714,6 +797,10 @@ void netMasterUpdate(void)
         for (int p = connectpoint2[connecthead]; p >= 0; p = connectpoint2[p])
             netSendPacket(p, packet, pPacket-packet);
         gNetFifoMasterTail++;
+#ifdef NORENDER
+        if (gNetMode == NETWORK_SERVER && gLevelTime%kTicsPerSec == 0)
+            notifySupervisor(1);
+#endif
     } while (1);
 }
 
@@ -921,6 +1008,16 @@ void netInitialize(bool bConsole)
         }
 
         numplayers = 1;
+#ifdef NORENDER
+        supervisorSocket = socket(PF_INET, SOCK_DGRAM, 0);
+        if (!supervisorSocket)
+            initprintf("Couldn't create socket for supervisor communicaton.\n");
+        memset(&supervisorAddress, 0, sizeof(sockaddr_in)); 
+        supervisorAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
+        supervisorAddress.sin_family = AF_INET;
+        supervisorAddress.sin_port = htons(11027);
+        notifySupervisor(0);
+#endif
         // Wait for clients
         if (!bConsole)
         {
@@ -931,6 +1028,9 @@ void netInitialize(bool bConsole)
         }
         while (numplayers < gNetPlayers)
         {
+#ifdef NORENDER
+            SDL_Delay(10);
+#endif
             handleevents();
             if (quitevent)
             {
@@ -956,6 +1056,9 @@ void netInitialize(bool bConsole)
                     enet_address_get_host_ip(&event.peer->address, ipaddr, sizeof(ipaddr));
                     initprintf("Client connected: %s:%u\n", ipaddr, event.peer->address.port);
                     numplayers++;
+#ifdef NORENDER
+                    notifySupervisor(0);
+#endif
                     for (int i = 1; i < kMaxPlayers; i++)
                     {
                         if (gNetPlayerPeer[i] == NULL)
@@ -980,6 +1083,9 @@ void netInitialize(bool bConsole)
                     enet_address_get_host_ip(&event.peer->address, ipaddr, sizeof(ipaddr));
                     initprintf("Client disconnected: %s:%u\n", ipaddr, event.peer->address.port);
                     numplayers--;
+#ifdef NORENDER
+                    notifySupervisor(0);
+#endif
                     for (int i = 1; i < kMaxPlayers; i++)
                     {
                         if (gNetPlayerPeer[i] == event.peer)
@@ -1357,7 +1463,17 @@ void netPlayerQuit(int nPlayer)
     numplayers = ClipLow(numplayers-1, 1);
     if (gNetPlayers <= 1)
     {
+#ifdef NORENDER
+        removeServer();
+#ifdef _WIN32
+        closesocket(supervisorSocket);
+#else
+        close(supervisorSocket);
+#endif
+        gQuitGame = true;
+#else
         netDeinitialize();
         netResetToSinglePlayer();
+#endif
     }
 }
