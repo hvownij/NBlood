@@ -1657,6 +1657,10 @@ void setrefreshrate(void)
 
 int32_t videoSetMode(int32_t x, int32_t y, int32_t c, int32_t fs)
 {
+#ifdef NORENDER
+    return 0;
+#endif
+
     int32_t regrab = 0, ret;
 
     ret = setvideomode_sdlcommon(&x, &y, c, fs, &regrab);

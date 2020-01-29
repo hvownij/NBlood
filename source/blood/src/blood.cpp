@@ -1365,6 +1365,10 @@ void ParseOptions(void)
             if (OptArgc < 1)
                 ThrowError("Missing argument");
             gNetPlayers = ClipRange(atoi(OptArgv[0]), 1, kMaxPlayers);
+#ifdef NORENDER
+            if (gNetPlayers < 2)
+                QuitGame();
+#endif
             gNetMode = NETWORK_SERVER;
             break;
         case 31:
@@ -1557,6 +1561,14 @@ void ParseOptions(void)
         strcpy(gUserMapFilename, zFName);
     }
 #endif
+#ifdef NORENDER
+    gNoSetup = true;
+    gCommandSetup = false;
+    bQuickStart = true;
+    bNoDemo = true;
+    if (gNetMode != NETWORK_SERVER)
+        ThrowError("You must start with '-server x' where x is the number of players.");
+#endif
 }
 
 void ClockStrobe()
@@ -1578,7 +1590,7 @@ int app_main(int argc, char const * const * argv)
     margc = argc;
     margv = argv;
 #ifdef _WIN32
-#ifndef DEBUGGINGAIDS
+#if !defined(DEBUGGINGAIDS) && !defined(NORENDER)
     if (!G_CheckCmdSwitch(argc, argv, "-noinstancechecking") && !windowsCheckAlreadyRunning())
     {
 #ifdef EDUKE32_STANDALONE
@@ -1862,13 +1874,22 @@ RESTART:
                 netCheckSync();
                 if (bDraw)
                 {
+#ifdef NORENDER
+                    int fpslimit = r_maxfps+r_maxfpsoffset;
+                    if (fpslimit != 0)
+                        SDL_Delay(1000/fpslimit);
+#else
                     viewDrawScreen();
+#endif
                     g_gameUpdateAndDrawTime = timerGetHiTicks() - gameUpdateStartTime;
                 }
             }
         }
         else
         {
+#ifdef NORENDER
+            SDL_Delay(10);
+#endif
             bDraw = viewFPSLimit() != 0;
             if (bDraw)
             {
@@ -1890,8 +1911,10 @@ RESTART:
             switch (gInputMode)
             {
             case INPUT_MODE_1:
+#ifndef NORENDER
                 if (gGameMenuMgr.m_bActive)
                     gGameMenuMgr.Process();
+#endif
                 break;
             case INPUT_MODE_0:
                 LocalKeys();
@@ -1907,8 +1930,10 @@ RESTART:
             switch (gInputMode)
             {
             case INPUT_MODE_1:
+#ifndef NORENDER
                 if (gGameMenuMgr.m_bActive)
                     gGameMenuMgr.Draw();
+#endif
                 break;
             case INPUT_MODE_2:
                 gPlayerMsg.ProcessKeys();
@@ -1916,7 +1941,9 @@ RESTART:
                 break;
             case INPUT_MODE_3:
                 gEndGameMgr.ProcessKeys();
+#ifndef NORENDER
                 gEndGameMgr.Draw();
+#endif
                 break;
             default:
                 break;
