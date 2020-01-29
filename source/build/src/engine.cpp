@@ -10742,6 +10742,9 @@ int32_t videoSetGameMode(char davidoption, int32_t daupscaledxdim, int32_t daups
 //
 void videoNextPage(void)
 {
+#ifdef NORENDER
+    return;
+#endif
     permfifotype *per;
 
     //char snotbuf[32];

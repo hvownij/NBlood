@@ -783,6 +783,10 @@ void OSD_SetLogFile(const char *fn)
     if (!fn)
         return;
 
+#ifdef NORENDER
+    return;
+#endif
+
     osdlog = buildvfs_fopen_write_text(fn);
 
     if (osdlog)
@@ -1660,10 +1664,12 @@ void OSD_Puts(const char *putstr, int const nolog /*= false*/)
     }
     else if (!nolog && (unsigned)errorCnt < (unsigned)l.cutoff)
     {
+#ifndef NORENDER
         auto s = Xstrdup(putstr);
         buildvfs_fputs(OSD_StripColors(s, putstr), osdlog);
         Bprintf("%s", s);
         Xfree(s);
+#endif
     }
 
     auto s = putstr;

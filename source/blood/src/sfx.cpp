@@ -423,6 +423,9 @@ void sfxKillAllSounds(void)
 
 void sfxUpdate3DSounds(void)
 {
+#ifdef NORENDER
+    return;
+#endif
     int dx = mulscale30(Cos(gMe->pSprite->ang + 512), 43);
     earL0 = earL;
     int dy = mulscale30(Sin(gMe->pSprite->ang + 512), 43);

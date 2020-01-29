@@ -80,9 +80,11 @@ void CEndGameMgr::ProcessKeys(void)
     //}
     //else
     {
+#ifndef NORENDER
         char ch = keyGetScan();
         if (!ch)
             return;
+#endif
         if (gGameOptions.nGameType > 0 || numplayers > 1)
             netWaitForEveryone(0);
         Finish();
