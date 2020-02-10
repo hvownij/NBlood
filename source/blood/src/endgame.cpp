@@ -80,7 +80,9 @@ void CEndGameMgr::ProcessKeys(void)
     //}
     //else
     {
-#ifndef NORENDER
+#ifdef NORENDER
+        SDL_Delay(2500);
+#else
         char ch = keyGetScan();
         if (!ch)
             return;
