@@ -706,10 +706,10 @@ static inline tspriteptr_t renderMakeTSpriteFromSprite(tspriteptr_t const tspr, 
     tspr->vel = spr->vel;
     tspr->lotag = spr->lotag;
     tspr->hitag = spr->hitag;
+    tspr->extra = spr->extra;
 
     tspr->clipdist = 0;
     tspr->owner = spritenum;
-    tspr->extra = 0;
 
     return tspr;
 }
@@ -1450,7 +1450,6 @@ enum {
 };
 
 extern int32_t glusetexcache, glusememcache;
-extern int32_t glmultisample, glnvmultisamplehint;
 extern int32_t glprojectionhacks;
 extern int32_t gltexmaxsize;
 void gltexapplyprops (void);
