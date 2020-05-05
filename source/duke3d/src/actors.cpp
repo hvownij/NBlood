@@ -22,6 +22,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #define actors_c_
 
+#ifndef EDUKE32_STANDALONE
+#include <map>
+#endif
+
 #include "duke3d.h"
 
 #if KRANDDEBUG
@@ -101,8 +105,22 @@ void A_RadiusDamageObject_Internal(int const spriteNum, int const otherSprite, i
     auto const pSprite = (uspriteptr_t)&sprite[spriteNum];
     auto const pOther  = &sprite[otherSprite];
 
+#ifndef EDUKE32_STANDALONE
+    if (WORLDTOUR && pSprite->picnum == FLAMETHROWERFLAME)
+    {
+        if (sprite[pSprite->owner].picnum == FIREFLY && pOther->picnum == FIREFLY)
+            return;
+        if (sprite[pSprite->owner].picnum == BOSS5 && pOther->picnum == BOSS5)
+            return;
+    }
+#endif
+
     // DEFAULT, ZOMBIEACTOR, MISC
-    if (pOther->statnum == STAT_DEFAULT || pOther->statnum == STAT_ZOMBIEACTOR || pOther->statnum == STAT_MISC || AFLAMABLE(pOther->picnum))
+    if (pOther->statnum == STAT_DEFAULT || pOther->statnum == STAT_ZOMBIEACTOR || pOther->statnum == STAT_MISC
+#ifndef EDUKE32_STANDALONE
+        || (!FURY && AFLAMABLE(pOther->picnum))
+#endif
+        )
     {
 #ifndef EDUKE32_STANDALONE
         if (pSprite->picnum != SHRINKSPARK || (pOther->cstat&257))
@@ -155,10 +173,16 @@ void A_RadiusDamageObject_Internal(int const spriteNum, int const otherSprite, i
 #endif
             )
             dmgActor.picnum = pSprite->picnum;
-        else dmgActor.picnum = RADIUSEXPLOSION;
+#ifndef EDUKE32_STANDALONE
+        else if (WORLDTOUR && (pSprite->picnum == FLAMETHROWERFLAME || pSprite->picnum == LAVAPOOL
+                 || (pSprite->picnum == FIREBALL && sprite[pSprite->owner].picnum == APLAYER)))
+            dmgActor.picnum = FLAMETHROWERFLAME;
+#endif
+        else
+            dmgActor.picnum = RADIUSEXPLOSION;
 
 #ifndef EDUKE32_STANDALONE
-        if (pSprite->picnum != SHRINKSPARK)
+        if (pSprite->picnum != SHRINKSPARK && (!WORLDTOUR || pSprite->picnum != LAVAPOOL))
 #endif
         {
             // this is really weird
@@ -1049,11 +1073,12 @@ ACTOR_STATIC void G_MoveZombieActors(void)
                                                      : sector[pSprite->sectnum].floorshade;
                                     actor[spriteNum].timetosleep = 0;
                                     changespritestat(spriteNum, STAT_STANDABLE);
+                                    break;
                                 }
-                                break;
+                                fallthrough__;
 
                             case RECON__STATIC:
-                                if (!FURY)
+                                if (!FURY && pSprite->picnum == RECON)
                                     CS(spriteNum) |= 257;
                                 fallthrough__;
 #endif
@@ -1340,7 +1365,7 @@ ACTOR_STATIC void G_MovePlayers(void)
                     otherPlayerDist = 0;
                 }
 
-                if (G_HaveActor(sprite[spriteNum].picnum))
+                if (G_TileHasActor(sprite[spriteNum].picnum))
                     A_Execute(spriteNum, P_GetP(pSprite), otherPlayerDist);
 
                 pPlayer->q16angvel    = P_GetQ16AngleDeltaForTic(pPlayer);
@@ -1405,7 +1430,7 @@ ACTOR_STATIC void G_MovePlayers(void)
 
                     if (pPlayer->wackedbyactor >= 0 && sprite[pPlayer->wackedbyactor].statnum < MAXSTATUS)
                     {
-                        pPlayer->q16ang += fix16_to_int(G_GetAngleDelta(pPlayer->q16ang,
+                        pPlayer->q16ang += fix16_from_int(G_GetAngleDelta(fix16_to_int(pPlayer->q16ang),
                                                                       getangle(sprite[pPlayer->wackedbyactor].x - pPlayer->pos.x,
                                                                                sprite[pPlayer->wackedbyactor].y - pPlayer->pos.y))
                                                       >> 1);
@@ -2056,28 +2081,26 @@ ACTOR_STATIC void G_MoveStandables(void)
                 pSprite->y += sintable[(T6(spriteNum))&2047]>>9;
                 pSprite->z -= (3<<8);
 
-                setsprite(spriteNum,&pSprite->pos);
+                int16_t const oldSectNum = pSprite->sectnum;
+                int16_t       curSectNum = pSprite->sectnum;
 
-                int hitDist = A_CheckHitSprite(spriteNum, &hitSprite);
+                updatesectorneighbor(pSprite->x, pSprite->y, &curSectNum, 1024, 2048);
+                changespritesect(spriteNum, curSectNum);
+
+                int32_t hitDist = A_CheckHitSprite(spriteNum, &hitSprite);
 
                 actor[spriteNum].lastv.x = hitDist;
                 pSprite->ang = oldAng;
 
-                //                if(lTripBombControl & TRIPBOMB_TRIPWIRE)
+                // we're on a trip wire
                 if (actor[spriteNum].t_data[6] != 1)
                 {
-                    // we're on a trip wire
-                    int16_t cursectnum;
-
                     while (hitDist > 0)
                     {
-                        j = A_Spawn(spriteNum,LASERLINE);
-                        setsprite(j,&sprite[j].pos);
+                        j = A_Spawn(spriteNum, LASERLINE);
+
                         sprite[j].hitag = pSprite->hitag;
                         actor[j].t_data[1] = sprite[j].z;
-
-                        pSprite->x += sintable[(T6(spriteNum)+512)&2047]>>4;
-                        pSprite->y += sintable[(T6(spriteNum))&2047]>>4;
 
                         if (hitDist < 1024)
                         {
@@ -2086,20 +2109,27 @@ ACTOR_STATIC void G_MoveStandables(void)
                         }
                         hitDist -= 1024;
 
-                        cursectnum = pSprite->sectnum;
-                        updatesector(pSprite->x, pSprite->y, &cursectnum);
-                        if (cursectnum < 0)
+                        pSprite->x += sintable[(T6(spriteNum)+512)&2047]>>4;
+                        pSprite->y += sintable[(T6(spriteNum))&2047]>>4;
+
+                        updatesectorneighbor(pSprite->x, pSprite->y, &curSectNum, 1024, 2048);
+
+                        if (curSectNum == -1)
                             break;
+
+                        changespritesect(spriteNum, curSectNum);
+
+                        // this is a hack to work around the LASERLINE sprite's art tile offset
+                        changespritesect(j, curSectNum);
                     }
                 }
 
                 T1(spriteNum)++;
 
-                pSprite->x = T4(spriteNum);
-                pSprite->y = T5(spriteNum);
+                pSprite->pos.vec2 = { T4(spriteNum), T5(spriteNum) };
                 pSprite->z += (3<<8);
 
-                setsprite(spriteNum,&pSprite->pos);
+                changespritesect(spriteNum, oldSectNum);
                 T4(spriteNum) = T3(spriteNum) = 0;
 
                 if (hitSprite >= 0 && actor[spriteNum].t_data[6] != 1)
@@ -2124,10 +2154,9 @@ ACTOR_STATIC void G_MoveStandables(void)
 
                 setsprite(spriteNum, &pSprite->pos);
 
-                int hitDist = A_CheckHitSprite(spriteNum, NULL);
+                int32_t const hitDist = A_CheckHitSprite(spriteNum, NULL);
 
-                pSprite->x = T4(spriteNum);
-                pSprite->y = T5(spriteNum);
+                pSprite->pos.vec2 = { T4(spriteNum), T5(spriteNum) };
                 pSprite->z += (3<<8);
                 setsprite(spriteNum, &pSprite->pos);
 
@@ -2707,7 +2736,7 @@ DETONATE:
                 case STEAM__STATIC:
                 case CEILINGSTEAM__STATIC:
                 case WATERBUBBLEMAKER__STATIC:
-                    if (!G_HaveActor(sprite[spriteNum].picnum))
+                    if (!G_TileHasActor(sprite[spriteNum].picnum))
                         goto next_sprite;
                     {
                         int32_t playerDist;
@@ -2881,7 +2910,7 @@ ACTOR_STATIC void Proj_MoveCustom(int const spriteNum)
     {
         case PROJECTILE_HITSCAN:
         {
-            if (!G_HaveActor(sprite[spriteNum].picnum))
+            if (!G_TileHasActor(sprite[spriteNum].picnum))
                 return;
             int32_t   playerDist;
             int const playerNum = A_FindPlayer(pSprite, &playerDist);
@@ -3131,6 +3160,17 @@ ACTOR_STATIC void Proj_MoveCustom(int const spriteNum)
     }
 }
 
+#ifndef EDUKE32_STANDALONE
+struct SpriteTracerData
+{
+    int32_t x, y, z;
+    int32_t xVel, yVel, zVel;
+    SpriteTracerData() : x(0), y(0), z(0), xVel(0), yVel(0), zVel(0) { }
+};
+
+std::map<int, SpriteTracerData> tracerData;
+#endif
+
 ACTOR_STATIC void G_MoveWeapons(void)
 {
     int spriteNum = headspritestat[STAT_PROJECTILE];
@@ -3157,7 +3197,7 @@ ACTOR_STATIC void G_MoveWeapons(void)
         {
             case SHOTSPARK1__STATIC:
             {
-                if (!G_HaveActor(sprite[spriteNum].picnum))
+                if (!G_TileHasActor(sprite[spriteNum].picnum))
                     goto next_sprite;
                 int32_t   playerDist;
                 int const playerNum = A_FindPlayer(pSprite, &playerDist);
@@ -3181,6 +3221,10 @@ ACTOR_STATIC void G_MoveWeapons(void)
                     sprite[newSprite].yrepeat = 32;
                     DELETE_SPRITE_AND_CONTINUE(spriteNum);
                 }
+                fallthrough__;
+            case FIREBALL__STATIC:
+                if (!WORLDTOUR && pSprite->picnum == FIREBALL)
+                    break;
                 fallthrough__;
             case SHRINKSPARK__STATIC:
             case RPG__STATIC:
@@ -3208,12 +3252,56 @@ ACTOR_STATIC void G_MoveWeapons(void)
 
                 A_GetZLimits(spriteNum);
 
+                int const fireball = (WORLDTOUR && pSprite->picnum == FIREBALL && sprite[pSprite->owner].picnum != FIREBALL);
+
                 if (pSprite->picnum == RPG && actor[spriteNum].picnum != BOSS2 && pSprite->xrepeat >= 10
                     && sector[pSprite->sectnum].lotag != ST_2_UNDERWATER
                     && g_scriptVersion >= 13)
                 {
                     int const newSprite = A_Spawn(spriteNum, SMALLSMOKE);
                     sprite[newSprite].z += (1 << 8);
+                }
+                if (pSprite->picnum == FIREBALL)
+                {
+                    if (sector[pSprite->sectnum].lotag == ST_2_UNDERWATER) { DELETE_SPRITE_AND_CONTINUE(spriteNum); }
+                    if (fireball)
+                    {
+                        if (actor[spriteNum].t_data[0] >= 1 && actor[spriteNum].t_data[0] < 6)
+                        {
+                            float t = 1.f - 0.2 * actor[spriteNum].t_data[0];
+                            int j = A_Spawn(spriteNum, FIREBALL);
+                            spritetype* sj = &sprite[j];
+                            sj->xvel = pSprite->xvel;
+                            sj->yvel = pSprite->yvel;
+                            sj->zvel = pSprite->zvel;
+                            if (actor[spriteNum].t_data[0] > 1)
+                            {
+                                SpriteTracerData t = tracerData[actor[spriteNum].t_data[1]];
+                                sj->x = t.x;
+                                sj->y = t.y;
+                                sj->z = t.z;
+                                sj->xvel = t.xVel;
+                                sj->yvel = t.yVel;
+                                sj->zvel = t.zVel;
+                            }
+                            sj->xrepeat = sj->yrepeat = t * pSprite->xrepeat;
+                            sj->cstat = pSprite->cstat;
+                            sj->extra = 0;
+                            actor[spriteNum].t_data[1] = j;
+                            SpriteTracerData tt;
+                            tt.x = sj->x;
+                            tt.y = sj->y;
+                            tt.z = sj->z;
+                            tt.xVel = sj->xvel;
+                            tt.yVel = sj->yvel;
+                            tt.zVel = sj->zvel;
+                            tracerData[actor[spriteNum].t_data[1]] = tt;
+                            changespritestat(j, 4);
+                        }
+                        actor[spriteNum].t_data[0]++;
+                    }
+                    if (pSprite->zvel < 15000)
+                        pSprite->zvel += 200;
                 }
 
                 vec3_t const tmpvect = { (spriteXvel * (sintable[(pSprite->ang + 512) & 2047])) >> 14 >> (int)!projectileMoved,
@@ -3277,7 +3365,8 @@ ACTOR_STATIC void G_MoveWeapons(void)
                                     DELETE_SPRITE_AND_CONTINUE(spriteNum);
                                 }
 
-                            A_DamageObject(moveSprite, spriteNum);
+                            if (!WORLDTOUR || pSprite->picnum != FIREBALL || fireball)
+                                A_DamageObject(moveSprite, spriteNum);
 
                             if (sprite[moveSprite].picnum == APLAYER)
                             {
@@ -3293,6 +3382,7 @@ ACTOR_STATIC void G_MoveWeapons(void)
                             moveSprite &= (MAXWALLS - 1);
 
                             if (pSprite->picnum != RPG && pSprite->picnum != FREEZEBLAST && pSprite->picnum != SPIT
+                                && (!WORLDTOUR || pSprite->picnum != FIREBALL)
                                 && (wall[moveSprite].overpicnum == MIRROR || wall[moveSprite].picnum == MIRROR))
                             {
                                 Proj_BounceOffWall(pSprite, moveSprite);
@@ -3343,6 +3433,15 @@ ACTOR_STATIC void G_MoveWeapons(void)
 
                                 goto next_sprite;
                             }
+
+                            if (pSprite->zvel >= 0 && fireball)
+                            {
+                                int lp = A_Spawn(spriteNum, LAVAPOOL);
+                                sprite[lp].owner = sprite[spriteNum].owner;
+                                sprite[lp].yvel = sprite[spriteNum].yvel;
+                                actor[lp].owner = sprite[spriteNum].owner;
+                                DELETE_SPRITE_AND_CONTINUE(spriteNum);
+                            }
                             break;
                         default: break;
                     }
@@ -3352,7 +3451,8 @@ ACTOR_STATIC void G_MoveWeapons(void)
                         case SPIT__STATIC:
                         case COOLEXPLOSION1__STATIC:
                         case FREEZEBLAST__STATIC:
-                        case FIRELASER__STATIC: break;
+                        case FIRELASER__STATIC:
+                            break;
 
                         case RPG__STATIC:
                         {
@@ -3395,6 +3495,10 @@ ACTOR_STATIC void G_MoveWeapons(void)
                             A_RadiusDamage(spriteNum, g_shrinkerRadius, 0, 0, 0, 0);
                             break;
 
+                        case FIREBALL__STATIC:
+                            if (WORLDTOUR)
+                                break;
+                            fallthrough__;
                         default:
                         {
                             int const newSprite       = A_Spawn(spriteNum, EXPLOSION2);
@@ -3409,6 +3513,12 @@ ACTOR_STATIC void G_MoveWeapons(void)
                             }
                             break;
                         }
+                    }
+
+                    if (fireball)
+                    {
+                        int ex = A_Spawn(spriteNum, EXPLOSION2);
+                        sprite[ex].xrepeat = sprite[ex].yrepeat = pSprite->xrepeat >> 1;
                     }
 
                     if (pSprite->picnum != COOLEXPLOSION1)
@@ -3932,6 +4042,108 @@ ACTOR_STATIC void G_MoveActors(void)
 #ifndef EDUKE32_STANDALONE
         switch (DYNAMICTILEMAP(switchPic))
         {
+        case FLAMETHROWERFLAME__STATIC:
+        {
+            if (!WORLDTOUR)
+                goto next_sprite;
+
+            if (G_TileHasActor(sprite[spriteNum].picnum))
+            {
+                int32_t playerDist;
+                int const playerNum = A_FindPlayer(pSprite, &playerDist);
+                A_Execute(spriteNum, playerNum, playerDist);
+            }
+
+            actor[spriteNum].t_data[0]++;
+            if (sector[pSprite->sectnum].lotag == ST_2_UNDERWATER)
+            {
+                int const newSprite = A_Spawn(spriteNum, EXPLOSION2);
+                sprite[newSprite].shade = 127;
+                DELETE_SPRITE_AND_CONTINUE(spriteNum);
+            }
+            int spriteXvel = pSprite->xvel;
+            int spriteZvel = pSprite->zvel;
+
+            vec3_t davect = pSprite->pos;
+
+            A_GetZLimits(spriteNum);
+
+            if (pSprite->xrepeat < 80)
+            {
+                pSprite->xrepeat += actor[spriteNum].t_data[0] / 6;
+                pSprite->yrepeat += actor[spriteNum].t_data[0] / 6;
+            }
+            pSprite->clipdist += actor[spriteNum].t_data[0] / 6;
+            if (actor[spriteNum].t_data[0] < 2)
+                actor[spriteNum].t_data[3] = krand() % 10;
+            if (actor[spriteNum].t_data[0] > 30)
+            {
+                int const newSprite = A_Spawn(spriteNum, EXPLOSION2);
+                sprite[newSprite].shade = 127;
+                DELETE_SPRITE_AND_CONTINUE(spriteNum);
+            }
+
+            vec3_t const tmpvect = { (spriteXvel * (sintable[(pSprite->ang + 512) & 2047])) >> 14,
+                                        (spriteXvel * (sintable[pSprite->ang & 2047])) >> 14, spriteZvel };
+
+            int moveSprite = A_MoveSprite(spriteNum, &tmpvect, CLIPMASK1);
+
+            actor[spriteNum].movflag = moveSprite;
+
+            if (pSprite->sectnum < 0)
+                DELETE_SPRITE_AND_CONTINUE(spriteNum);
+
+            if ((moveSprite & 49152) != 49152 && pSprite->picnum != FREEZEBLAST)
+                G_WeaponHitCeilingOrFloor(spriteNum, pSprite, &moveSprite);
+
+            if (moveSprite != 0)
+            {
+                switch (moveSprite & 49152)
+                {
+                case 49152:
+                    moveSprite &= (MAXSPRITES - 1);
+
+                    A_DamageObject(moveSprite, spriteNum);
+
+                    if (sprite[moveSprite].picnum == APLAYER)
+                    {
+                        A_PlaySound(PISTOL_BODYHIT, moveSprite);
+                    }
+                    break;
+
+                case 32768:
+                    moveSprite &= (MAXWALLS - 1);
+
+                    setsprite(spriteNum, &davect);
+                    A_DamageWall(spriteNum, moveSprite, pSprite->pos, pSprite->picnum);
+
+                    break;
+
+                case 16384:
+                    setsprite(spriteNum, &davect);
+
+                    if (pSprite->zvel < 0)
+                        Sect_DamageCeiling(spriteNum, pSprite->sectnum);
+                    else if (pSprite->zvel > 0)
+                        Sect_DamageFloor(spriteNum, pSprite->sectnum);
+                    break;
+                default: break;
+                }
+            }
+
+            if (pSprite->xrepeat >= 10)
+            {
+                int const x = pSprite->extra;
+                A_RadiusDamage(spriteNum, g_rpgRadius, x >> 2, x >> 1, x - (x >> 2), x);
+            }
+            else
+            {
+                int const x = pSprite->extra + (g_globalRandom & 3);
+                A_RadiusDamage(spriteNum, (g_rpgRadius >> 1), x >> 2, x >> 1, x - (x >> 2), x);
+            }
+
+            goto next_sprite;
+        }
         case DUCK__STATIC:
         case TARGET__STATIC:
             if (pSprite->cstat&32)
@@ -5162,7 +5374,7 @@ DETONATEB:
             }
         }
 
-        if (G_HaveActor(sprite[spriteNum].picnum))
+        if (G_TileHasActor(sprite[spriteNum].picnum))
         {
             int32_t playerDist;
             int const playerNum = A_FindPlayer(pSprite, &playerDist);
@@ -5234,6 +5446,17 @@ ACTOR_STATIC void G_MoveMisc(void)  // STATNUM 5
                     }
                     goto next_sprite;
 
+#ifndef EDUKE32_STANDALONE
+                case ONFIRESMOKE__STATIC:
+                case ONFIRE__STATIC:
+                case BURNEDCORPSE__STATIC:
+                case LAVAPOOLBUBBLE__STATIC:
+                case WHISPYSMOKE__STATIC:
+                case LAVAPOOL__STATIC:
+                    if (!WORLDTOUR)
+                        goto next_sprite;
+                    fallthrough__;
+#endif
                 case EXPLOSION2__STATIC:
                 case EXPLOSION2BOT__STATIC:
                 case FORCERIPPLE__STATIC:
@@ -5250,7 +5473,7 @@ ACTOR_STATIC void G_MoveMisc(void)  // STATNUM 5
                 case LASERSITE__STATIC:
 #endif
                 {
-                    if (!G_HaveActor(sprite[spriteNum].picnum))
+                    if (!G_TileHasActor(sprite[spriteNum].picnum))
                         goto next_sprite;
                     int const playerNum = A_FindPlayer(pSprite, &playerDist);
                     A_Execute(spriteNum, playerNum, playerDist);
@@ -5692,6 +5915,34 @@ ACTOR_STATIC void G_MoveMisc(void)  // STATNUM 5
 
                 A_SetSprite(spriteNum,CLIPMASK0);
 
+                goto next_sprite;
+
+            case FIREFLYFLYINGEFFECT__STATIC:
+                if (WORLDTOUR && G_TileHasActor(sprite[spriteNum].picnum))
+                {
+                    int playerDist;
+                    int const playerNum = A_FindPlayer(pSprite, &playerDist);
+                    A_Execute(spriteNum, playerNum, playerDist);
+                    spritetype *pPlayer = &sprite[g_player[playerNum].ps->i];
+                    spritetype* pOwner = &sprite[pSprite->owner];
+                    if (pOwner->picnum != FIREFLY) DELETE_SPRITE_AND_CONTINUE(spriteNum);
+                    if (pOwner->xrepeat < 24 && pOwner->pal != 1)
+                        pSprite->cstat &= ~32768;
+                    else
+                        pSprite->cstat |= 32768;
+                    float dx = pOwner->x-pPlayer->x;
+                    float dy = pOwner->y-pPlayer->y;
+                    float dn = sqrt(dx*dx+dy*dy);
+                    if (dn > 0.f)
+                    {
+                        dx /= dn;
+                        dy /= dn;
+                    }
+                    pSprite->x = pOwner->x-int(dx*-10.f);
+                    pSprite->y = pOwner->y-int(dy*-10.f);
+                    pSprite->z = pOwner->z+0x800;
+                    if (pOwner->extra <= 0) DELETE_SPRITE_AND_CONTINUE(spriteNum);
+                }
                 goto next_sprite;
             }
 #endif
@@ -6753,8 +7004,7 @@ ACTOR_STATIC void G_MoveEffectors(void)   //STATNUM 3
             else pData[0]=0;
             break;
 
-        case SE_11_SWINGING_DOOR: //Swingdoor
-
+        case SE_11_SWINGING_DOOR:
             if (pData[5] > 0)
             {
                 pData[5]--;
@@ -6763,40 +7013,72 @@ ACTOR_STATIC void G_MoveEffectors(void)   //STATNUM 3
 
             if (pData[4])
             {
-                int const endWall = pSector->wallptr+pSector->wallnum;
-
-                for (j=pSector->wallptr; j<endWall; j++)
+                auto dukeLivesMatter = [&](vec2_t const *const pos, int const w, int const clipdist)
                 {
-                    for (SPRITES_OF(STAT_ACTOR, k))
+                    if (clipinsidebox(pos, w, clipdist))
                     {
-                        if (sprite[k].extra > 0 &&
-                            (pSprite->sectnum == sprite[k].sectnum ||
-                             sectoradjacent(pSprite->sectnum, sprite[k].sectnum)) &&
-                            A_CheckEnemySprite(&sprite[k]) &&
-                            clipinsidebox(&sprite[k].pos.vec2, j, 256) == 1)
-                            goto next_sprite;
+                        uint16_t const tag = sector[pSprite->sectnum].lotag & 0x8000u;
+
+                        for (auto SPRITES_OF(STAT_EFFECTOR, i))
+                        {
+                            if (tag == (sector[SECT(i)].lotag & 0x8000u) && SLT(i) == SE_11_SWINGING_DOOR && pSprite->hitag == SHT(i))
+                            {
+                                actor[i].t_data[5] = 2; // delay
+                                actor[i].t_data[2] -= l;
+                                actor[i].t_data[4] -= l;
+                                A_MoveSector(i);
+
+                                actor[i].t_data[3] = -actor[i].t_data[3];
+                                if (actor[i].t_data[4] < 0)
+                                    actor[i].t_data[4] += 512;
+                                else
+                                    actor[i].t_data[4] -= 512;
+
+                                if (sector[SECT(i)].lotag & 0x8000u) sector[SECT(i)].lotag &= 0x7fff;
+                                else sector[SECT(i)].lotag |= 0x8000u;
+                            }
+                        }
+
+                        A_CallSound(pSprite->sectnum, spriteNum);
+
+                        return true;
                     }
-                }
+
+                    return false;
+                };
+
+                int const endWall = pSector->wallptr+pSector->wallnum;
 
                 l = (SP(spriteNum) >> 3) * pData[3];
                 pData[2] += l;
                 pData[4] += l;
-                A_MoveSector(spriteNum);
-                setsprite(spriteNum, &pSprite->pos);
 
-                for (j=pSector->wallptr; j<endWall; j++)
+                A_MoveSector(spriteNum);
+
+                for (auto SPRITES_OF(STAT_ACTOR, spr))
                 {
-                    for (SPRITES_OF(STAT_PLAYER, k))
+                    auto const foundSprite = (uspriteptr_t)&sprite[spr];
+
+                    if (foundSprite->extra > 0 && A_CheckEnemySprite(foundSprite))
                     {
-                        if (sprite[k].owner >= 0 && clipinsidebox(&sprite[k].pos.vec2, j, pPlayer->clipdist))
+                        auto const clipdist = A_GetClipdist(spr, -1);
+
+                        for (int w = pSector->wallptr; w < endWall; w++)
                         {
-                            pData[5] = 8;  // Delay
-                            pData[2] -= l;
-                            pData[4] -= l;
-                            A_MoveSector(spriteNum);
-                            setsprite(spriteNum, &pSprite->pos);
-                            goto next_sprite;
+                            if (dukeLivesMatter(&foundSprite->pos.vec2, w, clipdist))
+                                break;
                         }
+                    }
+                }
+
+                for (auto TRAVERSE_CONNECT(plr))
+                {
+                    auto const foundPlayer = g_player[plr].ps;
+
+                    for (int w = pSector->wallptr; w < endWall; w++)
+                    {
+                        if (dukeLivesMatter(&foundPlayer->pos.vec2, w, foundPlayer->clipdist))
+                            break;
                     }
                 }
 
@@ -6805,8 +7087,6 @@ ACTOR_STATIC void G_MoveEffectors(void)   //STATNUM 3
                     pData[4] = 0;
                     pData[2] &= 0xffffff00;
                     A_MoveSector(spriteNum);
-                    setsprite(spriteNum, &pSprite->pos);
-                    break;
                 }
             }
             break;
@@ -6952,6 +7232,10 @@ ACTOR_STATIC void G_MoveEffectors(void)   //STATNUM 3
                         }
                     }
                 }
+
+                for (int SPRITES_OF_SECT(pSprite->sectnum, p))
+                    if (sprite[p].statnum >= STAT_DEFAULT && sprite[p].statnum <= STAT_ZOMBIEACTOR)
+                        A_GetZLimits(p);
 
                 if (++pData[2] > 256)
                     DELETE_SPRITE_AND_CONTINUE(spriteNum);
@@ -8575,6 +8859,24 @@ void G_RefreshLights(void)
 #endif
 }
 
+static void G_RecordOldSpritePos(void)
+{
+    int statNum = 0;
+    do
+    {
+        int spriteNum = headspritestat[statNum++];
+
+        while (spriteNum >= 0)
+        {
+            int const nextSprite = nextspritestat[spriteNum];
+            actor[spriteNum].bpos = sprite[spriteNum].pos;
+
+            spriteNum = nextSprite;
+        }
+    }
+    while (statNum < MAXSTATUS);
+}
+
 static void G_DoEventGame(int const nEventID)
 {
     if (VM_HaveEvent(nEventID))
@@ -8614,6 +8916,8 @@ void G_MoveWorld(void)
     VM_OnEvent(EVENT_PREWORLD);
 
     G_DoEventGame(EVENT_PREGAME);
+
+    G_RecordOldSpritePos();
 
     G_MoveZombieActors();     //ST 2
     G_MoveWeapons();          //ST 4

@@ -167,7 +167,7 @@ void Net_WaitForEverybody(void)
     {
         //if (quitevent || keystatus[sc_Escape]) G_GameExit("");
 
-        if (G_FPSLimit())
+        if (engineFPSLimit())
         {
             display_betascreen();
             gametext_center_shade(170, "Waiting for players", 14);
@@ -1791,6 +1791,8 @@ void Net_GetInput(void)
         P_GetInputMotorcycle(myconnectindex);
     else if (RRRA && g_player[myconnectindex].ps->on_boat)
         P_GetInputBoat(myconnectindex);
+    else if (DEER)
+        P_DHGetInput(myconnectindex);
     else
         P_GetInput(myconnectindex);
 

@@ -1949,7 +1949,6 @@ DoNinjaGrabThroat(short SpriteNum)
     USERp u = User[SpriteNum];
     SPRITEp sp = User[SpriteNum]->SpriteP;
     int SpawnBlood(short SpriteNum, short Weapon, short hit_ang, int hit_x, int hit_y, int hit_z);
-    short cnt,i;
 
     if ((u->WaitTics -= ACTORMOVETICS) <= 0)
     {
@@ -1989,7 +1988,6 @@ int
 DoNinjaMove(short SpriteNum)
 {
     USERp u = User[SpriteNum];
-    SPRITEp sp = User[SpriteNum]->SpriteP;
 
     if (TEST(u->Flags2, SPR2_DYING))
     {
@@ -2066,7 +2064,6 @@ int
 NullNinja(short SpriteNum)
 {
     USERp u = User[SpriteNum];
-    SPRITEp sp = User[SpriteNum]->SpriteP;
 
     if (u->WaitTics > 0) u->WaitTics -= ACTORMOVETICS;
 
@@ -2084,7 +2081,6 @@ NullNinja(short SpriteNum)
 
 int DoNinjaPain(short SpriteNum)
 {
-    SPRITEp sp = &sprite[SpriteNum];
     USERp u = User[SpriteNum];
 
     NullNinja(SpriteNum);
@@ -2143,8 +2139,7 @@ DoNinjaCeiling(short SpriteNum)
 void
 InitAllPlayerSprites(void)
 {
-    short i, sp_num;
-    USERp u;
+    short i;
 
     TRAVERSE_CONNECT(i)
     {
@@ -2360,7 +2355,6 @@ void
 PlayerSpriteLoadLevel(short SpriteNum)
 {
     USERp u = User[SpriteNum];
-    SPRITEp sp = User[SpriteNum]->SpriteP;
 
     ChangeState(SpriteNum, s_NinjaRun[0]);
     u->Rot = sg_NinjaRun;
@@ -2370,7 +2364,7 @@ PlayerSpriteLoadLevel(short SpriteNum)
 void
 InitPlayerSprite(PLAYERp pp)
 {
-    short i, sp_num;
+    short sp_num;
     SPRITE *sp;
     USERp u;
     int pnum = pp - Player;
@@ -2379,7 +2373,7 @@ InitPlayerSprite(PLAYERp pp)
     COVER_SetReverb(0); // Turn off any echoing that may have been going before
     pp->Reverb = 0;
     sp_num = pp->PlayerSprite = SpawnSprite(STAT_PLAYER0 + pnum, NINJA_RUN_R0, NULL, pp->cursectnum, pp->posx,
-                                            pp->posy, pp->posz, pp->pang, 0);
+                                            pp->posy, pp->posz, fix16_to_int(pp->q16ang), 0);
 
     pp->SpriteP = sp = &sprite[sp_num];
     pp->pnum = pnum;
@@ -2459,7 +2453,7 @@ SpawnPlayerUnderSprite(PLAYERp pp)
     int pnum = pp - Player, sp_num;
 
     sp_num = pp->PlayerUnderSprite = SpawnSprite(STAT_PLAYER_UNDER0 + pnum,
-                                                 NINJA_RUN_R0, NULL, pp->cursectnum, pp->posx, pp->posy, pp->posz, pp->pang, 0);
+                                                 NINJA_RUN_R0, NULL, pp->cursectnum, pp->posx, pp->posy, pp->posz, fix16_to_int(pp->q16ang), 0);
 
     sp = &sprite[sp_num];
     u = User[sp_num];

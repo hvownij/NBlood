@@ -381,12 +381,22 @@ extern char MessageOutputString[256];
 
 #define NORM_ANGLE(ang) ((ang) & 2047)
 #define ANGLE_2_PLAYER(pp,x,y) (NORM_ANGLE(getangle(pp->posx-(x), pp->posy-(y))))
+#define NORM_Q16ANGLE(ang) ((ang) & 0x7FFFFFF)
 
 
 int StdRandomRange(int range);
 #define STD_RANDOM_P2(pwr_of_2) (MOD_P2(rand(),(pwr_of_2)))
 #define STD_RANDOM_RANGE(range) (StdRandomRange(range))
 #define STD_RANDOM() (rand())
+
+#if 0
+// TODO: PedanticMode
+#define RANDOM_NEG(x,y) (PedanticMode \
+                        ? ((RANDOM_P2(((x)<<(y))<<1) -  (x))<<(y)) \
+                        :  (RANDOM_P2(((x)<<(y))<<1) - ((x) <<(y))))
+#else
+#define RANDOM_NEG(x,y) ((RANDOM_P2(((x)<<(y))<<1) - (x))<<(y))
+#endif
 
 #define MOVEx(vel,ang) (((int)(vel) * (int)sintable[NORM_ANGLE((ang) + 512)]) >> 14)
 #define MOVEy(vel,ang) (((int)(vel) * (int)sintable[NORM_ANGLE((ang))]) >> 14)
@@ -476,11 +486,11 @@ int StdRandomRange(int range);
 
 #define KENFACING_PLAYER(pp,sp) (sintable[NORM_ANGLE(sp->ang+512)]*(pp->posy-sp->y) >= sintable[NORM_ANGLE(sp-ang)]*(pp->posx-sp->x))
 #define FACING_PLAYER(pp,sp) (labs(GetDeltaAngle((sp)->ang, NORM_ANGLE(getangle((pp)->posx - (sp)->x, (pp)->posy - (sp)->y)))) < 512)
-#define PLAYER_FACING(pp,sp) (labs(GetDeltaAngle((pp)->pang, NORM_ANGLE(getangle((sp)->x - (pp)->posx, (sp)->y - (pp)->posy)))) < 320)
+#define PLAYER_FACING(pp,sp) (labs(GetDeltaAngle(fix16_to_int((pp)->q16ang), NORM_ANGLE(getangle((sp)->x - (pp)->posx, (sp)->y - (pp)->posy)))) < 320)
 #define FACING(sp1,sp2) (labs(GetDeltaAngle((sp2)->ang, NORM_ANGLE(getangle((sp1)->x - (sp2)->x, (sp1)->y - (sp2)->y)))) < 512)
 
 #define FACING_PLAYER_RANGE(pp,sp,range) (labs(GetDeltaAngle((sp)->ang, NORM_ANGLE(getangle((pp)->posx - (sp)->x, (pp)->posy - (sp)->y)))) < (range))
-#define PLAYER_FACING_RANGE(pp,sp,range) (labs(GetDeltaAngle((pp)->pang, NORM_ANGLE(getangle((sp)->x - (pp)->posx, (sp)->y - (pp)->posy)))) < (range))
+#define PLAYER_FACING_RANGE(pp,sp,range) (labs(GetDeltaAngle(fix16_to_int((pp)->q16ang), NORM_ANGLE(getangle((sp)->x - (pp)->posx, (sp)->y - (pp)->posy)))) < (range))
 #define FACING_RANGE(sp1,sp2,range) (labs(GetDeltaAngle((sp2)->ang, NORM_ANGLE(getangle((sp1)->x - (sp2)->x, (sp1)->y - (sp2)->y)))) < (range))
 
 // two vectors
@@ -812,6 +822,9 @@ extern int PlayerYellVocs[MAX_YELLSOUNDS];
 
 void BossHealthMeter(void);
 
+extern SWBOOL PedanticMode;
+extern SWBOOL InterpolateSectObj;
+
 // Global variables used for modifying variouse things from the Console
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -863,6 +876,7 @@ void CON_CommandHistory(signed char dir);
 SWBOOL CON_AddCommand(const char *command, void (*function)(void));
 void CON_ProcessUserCommand(void);
 void CON_InitConsole(void);
+void CON_Quit(void);
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -974,6 +988,7 @@ extern const char *ReadFortune[MAX_FORTUNES];
 extern const char *KeyMsg[MAX_KEYS];
 extern const char *KeyDoorMessage[MAX_KEYS];
 
+#pragma pack(push,1)
 typedef struct
 {
     int16_t vel;
@@ -981,7 +996,20 @@ typedef struct
     int8_t angvel;
     int8_t aimvel;
     int32_t bits;
+} OLD_SW_PACKET;
+
+// TODO: Support compatible read/write of struct for big-endian
+typedef struct
+{
+    int16_t vel;
+    int16_t svel;
+    fix16_t q16angvel;
+    fix16_t q16aimvel;
+    fix16_t q16ang;
+    fix16_t q16horiz;
+    int32_t bits;
 } SW_PACKET;
+#pragma pack(pop)
 
 extern SW_PACKET loc;
 
@@ -1013,8 +1041,7 @@ struct PLAYERstruct
     // interpolation
     int
         oposx, oposy, oposz;
-    short oang;
-    short ohoriz;
+    fix16_t oq16horiz, oq16ang;
 
     // holds last valid move position
     short lv_sectnum;
@@ -1060,11 +1087,13 @@ struct PLAYERstruct
     short circle_camera_ang;
     short camera_check_time_delay;
 
-    short pang,cursectnum,lastcursectnum;
+    short cursectnum,lastcursectnum;
     short turn180_target; // 180 degree turn
 
     // variables that do not fit into sprite structure
-    int horizbase,horiz,horizoff,hvel,tilt,tilt_dest;
+    int hvel,tilt,tilt_dest;
+    fix16_t q16horiz, q16horizbase, q16horizoff, q16ang;
+    fix16_t camq16horiz, camq16ang;
     short recoil_amt;
     short recoil_speed;
     short recoil_ndx;
@@ -2319,10 +2348,10 @@ void post_analyzesprites(void); // draw.c
 int COVERsetgamemode(int mode, int xdim, int ydim, int bpp);    // draw.c
 void ScreenCaptureKeys(void);   // draw.c
 
-int minigametext(int x,int y,const char *t,char s,short dabits);  // jplayer.c
+int minigametext(int x,int y,const char *t,short dabits);  // jplayer.c
 void computergetinput(int snum,SW_PACKET *syn); // jplayer.c
 
-void DrawOverlapRoom(int tx,int ty,int tz,short tang,int thoriz,short tsectnum);    // rooms.c
+void DrawOverlapRoom(int tx,int ty,int tz,fix16_t tq16ang,fix16_t tq16horiz,short tsectnum);    // rooms.c
 void SetupMirrorTiles(void);    // rooms.c
 SWBOOL FAF_Sector(short sectnum); // rooms.c
 int GetZadjustment(short sectnum,short hitag);  // rooms.c
@@ -2354,7 +2383,7 @@ SWBOOL VatorSwitch(short match, short setting); // vator.c
 void MoveSpritesWithSector(short sectnum,int z_amt,SWBOOL type);  // vator.c
 void SetVatorActive(short SpriteNum);   // vator.c
 
-short DoSpikeMatch(PLAYERp pp,short match); // spike.c
+short DoSpikeMatch(short match); // spike.c
 void SpikeAlign(short SpriteNum);   // spike.c
 
 short DoSectorObjectSetScale(short match);  // morph.c
@@ -2372,7 +2401,7 @@ int DoWallMoveMatch(short match);   // wallmove.c
 int DoWallMove(SPRITEp sp); // wallmove.c
 SWBOOL CanSeeWallMove(SPRITEp wp,short match);    // wallmove.c
 
-short DoSpikeOperate(PLAYERp pp,short sectnum); // spike.c
+short DoSpikeOperate(short sectnum); // spike.c
 void SetSpikeActive(short SpriteNum);   // spike.c
 
 #define NTAG_SEARCH_LO 1

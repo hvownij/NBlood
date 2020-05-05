@@ -30,6 +30,7 @@ Prepared for public release: 03/28/2005 - Charlie Wiederhold, 3D Realms
 #include "names2.h"
 #include "panel.h"
 #include "game.h"
+#include "interp.h"
 #include "tags.h"
 #include "common_game.h"
 #include "break.h"
@@ -114,7 +115,7 @@ int SpawnDemonFist(short Weapon);
 int SpawnTankShellExp(int16_t Weapon);
 int SpawnMicroExp(int16_t Weapon);
 void SpawnExpZadjust(short Weapon, SPRITEp exp, int upper_zsize, int lower_zsize);
-int BulletHitSprite(SPRITEp sp,short hit_sprite,short hit_sect,short hit_wall,int hit_x,int hit_y,int hit_z,short ID);
+int BulletHitSprite(SPRITEp sp,short hit_sprite,int hit_x,int hit_y,int hit_z,short ID);
 int SpawnSplashXY(int hit_x,int hit_y,int hit_z,short);
 int SpawnBoatSparks(PLAYERp pp,short hit_sect,short hit_wall,int hit_x,int hit_y,int hit_z,short hit_ang);
 
@@ -2644,7 +2645,6 @@ SWBOOL MissileHitMatch(short Weapon, short WeaponNum, short hit_sprite)
     if (WeaponNum <= -1)
     {
         ASSERT(Weapon >= 0);
-        SPRITEp wp = &sprite[Weapon];
         USERp wu = User[Weapon];
         WeaponNum = wu->WeaponNum;
 
@@ -3032,11 +3032,13 @@ SpawnShrap(short ParentNum, short Secondary)
         {NULL,0,0,0,0,0,0,0,0,0},
     };
 
+#if 0
     static SHRAP LowerGore[] =
     {
         {s_GoreLeg, GORE_Leg, 4, Z_BOT, 300, 500, 100, 200, TRUE, 2048},
         {NULL,0,0,0,0,0,0,0,0,0},
     };
+#endif
 
     static SHRAP SmallGore[] =
     {
@@ -3053,6 +3055,7 @@ SpawnShrap(short ParentNum, short Secondary)
         {NULL,0,0,0,0,0,0,0,0,0},
     };
 
+#if 0
     static SHRAP BoltExpShrap[] =
     {
         {s_GoreFlame, GORE_Drip, 4, Z_MID, 300, 700, 300, 600, TRUE, 2048},
@@ -3083,6 +3086,7 @@ SpawnShrap(short ParentNum, short Secondary)
         FireballExpShrap1,
         FireballExpShrap2
     };
+#endif
 
     // state, id, num, zlevel, min_jspeed, max_jspeed, min_vel, max_vel,
     // random_disperse, ang_range;
@@ -3118,11 +3122,13 @@ SpawnShrap(short ParentNum, short Secondary)
         {NULL,0,0,0,0,0,0,0,0,0},
     };
 
+#if 0
     static SHRAP SectorSquishGore[] =
     {
         {s_FastGoreDrip,    GORE_Drip,   24, Z_MID, -400, -200, 600, 800, FALSE, 2048},
         {NULL,0,0,0,0,0,0,0,0,0},
     };
+#endif
 
 
 
@@ -3171,11 +3177,13 @@ SpawnShrap(short ParentNum, short Secondary)
 
 #define WALL_FLOOR_SHRAP 4097
     ANIMATOR DoShrapWallFloor;
+#if 0
     static SHRAP SectorExpShrap[] =
     {
         {NULL, WALL_FLOOR_SHRAP, 1, Z_BOT, 550, 800, 200, 400, TRUE, 512},
         {NULL,0,0,0,0,0,0,0,0,0},
     };
+#endif
 
     int hz[3];
     short dang = 0;
@@ -3188,7 +3196,6 @@ SpawnShrap(short ParentNum, short Secondary)
     short shrap_pal = PALETTE_DEFAULT;
     int shrap_floor_dist = Z(2);
     int shrap_ceiling_dist = Z(2);
-    int shrap_z = 0;
     int nx,ny;
     short jump_grav = ACTOR_GRAVITY;
     short start_ang = 0;
@@ -3464,13 +3471,13 @@ AutoShrap:
                 short spnum;
                 short size;
                 SPRITEp ep;
-                USERp eu;
+//                USERp eu;
 
                 spnum = SpawnLargeExp(ParentNum);
                 ASSERT(spnum >= 0);
                 //spnum = SpawnSectorExp(ParentNum);
                 ep = &sprite[spnum];
-                eu = User[spnum];
+//                eu = User[spnum];
 
                 //eu->xchange = MOVEx(92, ep->ang);
                 //eu->ychange = MOVEy(92, ep->ang);
@@ -3486,13 +3493,13 @@ AutoShrap:
                 short spnum;
                 short size;
                 SPRITEp ep;
-                USERp eu;
+//                USERp eu;
 
                 //spnum = SpawnSectorExp(ParentNum);
                 spnum = SpawnLargeExp(ParentNum);
                 ASSERT(spnum >= 0);
                 ep = &sprite[spnum];
-                eu = User[spnum];
+//                eu = User[spnum];
 
                 //eu->xchange = MOVEx(92, ep->ang);
                 //eu->ychange = MOVEy(92, ep->ang);
@@ -3720,7 +3727,6 @@ AutoShrap:
     // most of the time is is the weapon
     if (Secondary >= 0)
     {
-        SPRITEp wp = &sprite[Secondary];
         USERp wu = User[Secondary];
 
         if (wu->PlayerP && wu->PlayerP->sop_control)
@@ -3869,7 +3875,6 @@ AutoShrap:
 int
 DoShrapMove(int16_t SpriteNum)
 {
-    SPRITEp sp = &sprite[SpriteNum];
     USERp u = User[SpriteNum];
 
     u->ret = move_missile(SpriteNum, u->xchange, u->ychange, 0, u->ceiling_dist, u->floor_dist, CLIPMASK_MISSILE, MISSILEMOVETICS*2);
@@ -3978,7 +3983,6 @@ DoVomit(short SpriteNum)
 int
 DoVomitSplash(short SpriteNum)
 {
-    SPRITEp sp = &sprite[SpriteNum];
     USERp u = User[SpriteNum];
 
     if ((u->WaitTics-=MISSILEMOVETICS) < 0)
@@ -4029,9 +4033,7 @@ DoTracerShrap(short SpriteNum)
 int
 DoShrapJumpFall(short SpriteNum)
 {
-    SPRITEp sp = &sprite[SpriteNum];
     USERp u = User[SpriteNum];
-    int16_t rnd_num;
 
     if (TEST(u->Flags, SPR_JUMPING))
     {
@@ -4143,11 +4145,13 @@ SpawnBlood(short SpriteNum, short Weapon, short hit_ang, int hit_x, int hit_y, i
         {NULL,0,0,0,0,0,0,0,0,0},
     };
 
+#if 0
     static SHRAP MoreBlood[] =
     {
         {s_GoreDrip, GORE_Drip, 2, Z_TOP, 100, 250, 10, 20, TRUE, 512},
         {NULL,0,0,0,0,0,0,0,0,0},
     };
+#endif
 
     static SHRAP ExtraBlood[] =
     {
@@ -4161,13 +4165,14 @@ SpawnBlood(short SpriteNum, short Weapon, short hit_ang, int hit_x, int hit_y, i
         {NULL,0,0,0,0,0,0,0,0,0},
     };
 
+#if 0
     static SHRAP SwordPowerup[] =
     {
         {s_ElectroShrap, ELECTRO_SHARD, 16, Z_TOP, 75, 200, 70, 150, TRUE, 512},
         {NULL,0,0,0,0,0,0,0,0,0},
     };
+#endif
 
-    int hz;
     short dang = 0;
 
     SHRAPp p = UziBlood;
@@ -4175,7 +4180,6 @@ SpawnBlood(short SpriteNum, short Weapon, short hit_ang, int hit_x, int hit_y, i
     short shrap_xsize = 20, shrap_ysize = 20;
     short retval = TRUE;
     short shrap_pal = PALETTE_DEFAULT;
-    int shrap_z = 0;
     short start_ang = 0;
 
     u = User[SpriteNum];
@@ -4359,8 +4363,8 @@ SpawnBlood(short SpriteNum, short Weapon, short hit_ang, int hit_x, int hit_y, i
 SWBOOL
 VehicleMoveHit(short SpriteNum)
 {
-    USERp u = User[SpriteNum],cu;
-    SPRITEp sp = User[SpriteNum]->SpriteP,cp;
+    USERp u = User[SpriteNum];
+    SPRITEp cp;
     SECTOR_OBJECTp sop;
     SECTOR_OBJECTp hsop;
     SWBOOL TestKillSectorObject(SECTOR_OBJECTp);
@@ -4374,7 +4378,6 @@ VehicleMoveHit(short SpriteNum)
     // sprite controlling sop
     cp = sop->controller;
     controller = cp - sprite;
-    cu = User[controller];
 
     switch (TEST(u->ret, HIT_MASK))
     {
@@ -4637,7 +4640,7 @@ WeaponMoveHit(short SpriteNum)
         {
             if (hsp->lotag || hsp->hitag)
             {
-                ShootableSwitch(hit_sprite, SpriteNum);
+                ShootableSwitch(hit_sprite);
                 return TRUE;
             }
         }
@@ -4698,7 +4701,7 @@ WeaponMoveHit(short SpriteNum)
             {
                 if (hsp->lotag || hsp->hitag)
                 {
-                    ShootableSwitch(hitinfo.sprite,SpriteNum);
+                    ShootableSwitch(hitinfo.sprite);
                     return TRUE;
                 }
             }
@@ -4715,8 +4718,6 @@ int
 DoUziSmoke(short SpriteNum)
 {
     SPRITEp sp = &sprite[SpriteNum];
-    short pnum;
-    PLAYERp pp;
 
     //if (sp->picnum != NULL)
     //    DoDamageTest(SpriteNum);
@@ -4729,8 +4730,6 @@ int
 DoShotgunSmoke(short SpriteNum)
 {
     SPRITEp sp = &sprite[SpriteNum];
-    short pnum;
-    PLAYERp pp;
 
     //if (sp->picnum != NULL)
     //    DoDamageTest(SpriteNum);
@@ -4743,8 +4742,6 @@ int
 DoMineSpark(short SpriteNum)
 {
     SPRITEp sp = &sprite[SpriteNum];
-    short pnum;
-    PLAYERp pp;
 
     if (sp->picnum != 0)
     {
@@ -4854,7 +4851,7 @@ DoFireballFlames(short SpriteNum)
 int
 DoBreakFlames(short SpriteNum)
 {
-    SPRITEp sp = &sprite[SpriteNum],ap;
+    SPRITEp sp = &sprite[SpriteNum];
     USERp u = User[SpriteNum];
     SWBOOL jumping = FALSE;
 
@@ -4932,7 +4929,6 @@ int
 SetSuicide(short SpriteNum)
 {
 #if 1
-    SPRITEp sp = &sprite[SpriteNum];
     USERp u = User[SpriteNum];
 
     if (u != nullptr)
@@ -5448,8 +5444,6 @@ SopDamage(SECTOR_OBJECTp sop, short amt)
 int
 SopCheckKill(SECTOR_OBJECTp sop)
 {
-    SPRITEp sp = sop->sp_child;
-    USERp u = User[sp - sprite];
     SWBOOL killed = FALSE;
     void VehicleSetSmoke(SECTOR_OBJECTp sop, ANIMATORp animator);
 
@@ -5477,7 +5471,6 @@ SopCheckKill(SECTOR_OBJECTp sop)
 int
 ActorPain(short SpriteNum)
 {
-    SPRITEp sp = &sprite[SpriteNum];
     USERp u = User[SpriteNum];
 
     //if (u->LastDamage < u->PainThreshold)  // This doesn't work well at all because of
@@ -5514,7 +5507,6 @@ ActorPain(short SpriteNum)
 int
 ActorPainPlasma(short SpriteNum)
 {
-    SPRITEp sp = &sprite[SpriteNum];
     USERp u = User[SpriteNum];
 
     if (!TEST(u->Flags, SPR_JUMPING | SPR_FALLING | SPR_ELECTRO_TOLERANT))
@@ -5572,7 +5564,6 @@ ActorStdMissile(short SpriteNum, short Weapon)
 int
 ActorDamageSlide(short SpriteNum, short damage, short ang)
 {
-    SPRITEp sp = &sprite[SpriteNum];
     USERp u = User[SpriteNum];
     int slide_vel,slide_dec;
 
@@ -5614,7 +5605,6 @@ int
 PlayerDamageSlide(PLAYERp pp, short damage, short ang)
 {
     int slide_vel;
-    USERp u = User[pp->PlayerSprite];
 
     damage = labs(damage);
 
@@ -5645,8 +5635,6 @@ PlayerDamageSlide(PLAYERp pp, short damage, short ang)
     }
     else
     {
-        extern char PlayerGravity;
-
         slide_vel = (damage * 6);
 
         pp->slide_xvect = MOVEx(slide_vel, ang)<<15;
@@ -5668,9 +5656,7 @@ GetDamage(short SpriteNum, short Weapon, short DamageNdx)
     if (d->radius > 0)
     {
         SPRITEp sp = &sprite[SpriteNum];
-        USERp u = User[SpriteNum];
         SPRITEp wp = &sprite[Weapon];
-        USERp wu = User[Weapon];
         int dist,a,b,c;
         int damage_per_pixel, damage_force, damage_amt;
 
@@ -5708,7 +5694,6 @@ int
 RadiusGetDamage(short SpriteNum, short Weapon, int max_damage)
 {
     SPRITEp sp = &sprite[SpriteNum];
-    USERp u = User[SpriteNum];
     SPRITEp wp = &sprite[Weapon];
     USERp wu = User[Weapon];
     int dist,a,b,c;
@@ -5785,8 +5770,6 @@ PlayerCheckDeath(PLAYERp pp, short Weapon)
 
         if (Weapon > -1 && wu->ID == NINJA_RUN_R0 && wu->PlayerP)
         {
-            PLAYERp wp = wu->PlayerP;
-
             pp->DeathType = PLAYER_DEATH_FLIP;
             wu->PlayerP->Bloody = TRUE;
         }
@@ -5822,7 +5805,6 @@ PlayerTakeDamage(PLAYERp pp, short Weapon)
     if (Weapon < 0)
         return TRUE;
 
-    SPRITEp sp = pp->SpriteP;
     USERp u = User[pp->PlayerSprite];
     SPRITEp wp = &sprite[Weapon];
     USERp   wu = User[Weapon];
@@ -5926,7 +5908,6 @@ DoDamage(short SpriteNum, short Weapon)
     USERp u = User[SpriteNum];
     SPRITEp wp;
     USERp wu;
-    int dist;
     int damage=0;
 
     ASSERT(u);
@@ -7604,8 +7585,6 @@ static int DoHitscanDamage(short Weapon, uint16_t hit_sprite)
     if (hit_sprite >= MAXSPRITES)
         return 0;
 
-    SPRITEp wp = &sprite[Weapon];
-    USERp wu = User[Weapon];
     unsigned stat;
 
     // this routine needs some sort of sprite generated from the hitscan
@@ -7717,7 +7696,7 @@ short StatBreakList[] =
 void TraverseBreakableWalls(short start_sect, int x, int y, int z, short ang, int radius)
 {
     int WallBreakPosition(short hit_wall, short *sectnum, int *x, int *y, int *z, short *ang);
-    int i, j, k;
+    int j, k;
     short sectlist[MAXSECTORS]; // !JIM! Frank, 512 was not big enough for $dozer, was asserting out!
     short sectlistplc, sectlistend, sect, startwall, endwall, nextsector;
     int xmid,ymid;
@@ -7846,8 +7825,6 @@ int DoExpDamageTest(short Weapon)
             }
             else
             {
-                int zdist=0;
-
                 if ((unsigned)FindDistance3D(sp->x - wp->x, sp->y - wp->y, sp->z - wp->z) > wu->Radius + u->Radius)
                     continue;
 
@@ -7938,8 +7915,6 @@ int DoExpDamageTest(short Weapon)
         }
         else
         {
-            SWBOOL once = FALSE;
-
             if (DoWallMoveMatch(SP_TAG2(found_sp)))
             {
                 DoSpawnSpotsForDamage(SP_TAG2(found_sp));
@@ -7958,7 +7933,7 @@ int DoMineExpMine(short Weapon)
 
     USERp u;
     SPRITEp sp;
-    short i, nexti, stat;
+    short i, nexti;
     int dist, tx, ty;
     int tmin;
     int zdist;
@@ -7998,11 +7973,7 @@ DoStar(int16_t Weapon)
 {
     SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
-    int32_t enemy, next_enemy, dax, day, daz, nextj;
-    short NewWeapon, pnum;
     USERp su;
-    PLAYERp pp;
-    short ret;
     int vel;
 
 //    if (!TEST(u->Flags, SPR_BOUNCE))
@@ -8058,7 +8029,7 @@ DoStar(int16_t Weapon)
 
         case HIT_WALL:
         {
-            short hit_wall,nw,wall_ang,dang;
+            short hit_wall,nw,wall_ang;
             WALLp wph;
 
             hit_wall = NORM_WALL(u->ret);
@@ -8227,12 +8198,7 @@ DoStar(int16_t Weapon)
 int
 DoCrossBolt(int16_t Weapon)
 {
-    SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
-    int32_t dax, day, daz;
-    short NewWeapon;
-
-    int offset;
 
     u = User[Weapon];
 
@@ -8307,15 +8273,13 @@ int PickEnemyTarget(SPRITEp sp, short aware_range)
 }
 
 int
-MissileSeek(int16_t Weapon, int16_t delay_tics, int16_t aware_range, int16_t dang_shift, int16_t turn_limit, int16_t z_limit)
+MissileSeek(int16_t Weapon, int16_t delay_tics, int16_t aware_range/*, int16_t dang_shift, int16_t turn_limit, int16_t z_limit*/)
 {
     SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
 
-    int dist;
     int zh;
-    short ang2tgt, delta_ang, ang_adj;
-    int ozvel;
+    short ang2tgt, delta_ang;
 
     SPRITEp hp;
 
@@ -8332,7 +8296,6 @@ MissileSeek(int16_t Weapon, int16_t delay_tics, int16_t aware_range, int16_t dan
             {
                 if ((hit_sprite = PickEnemyTarget(sp, aware_range)) != -1)
                 {
-                    SPRITEp hp = &sprite[hit_sprite];
                     USERp hu = User[hit_sprite];
 
                     u->WpnGoal = hit_sprite;
@@ -8342,7 +8305,6 @@ MissileSeek(int16_t Weapon, int16_t delay_tics, int16_t aware_range, int16_t dan
             }
             else if ((hit_sprite = DoPickTarget(sp, aware_range, FALSE)) != -1)
             {
-                SPRITEp hp = &sprite[hit_sprite];
                 USERp hu = User[hit_sprite];
 
                 u->WpnGoal = hit_sprite;
@@ -8394,15 +8356,14 @@ MissileSeek(int16_t Weapon, int16_t delay_tics, int16_t aware_range, int16_t dan
 
 // combination of vector manipulation
 int
-ComboMissileSeek(int16_t Weapon, int16_t delay_tics, int16_t aware_range, int16_t dang_shift, int16_t turn_limit, int16_t z_limit)
+ComboMissileSeek(int16_t Weapon, int16_t delay_tics, int16_t aware_range/*, int16_t dang_shift, int16_t turn_limit, int16_t z_limit*/)
 {
     SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
 
     int dist;
     int zh;
-    short ang2tgt, delta_ang, ang_adj;
-    int ozvel;
+    short ang2tgt, delta_ang;
 
     SPRITEp hp;
 
@@ -8417,7 +8378,6 @@ ComboMissileSeek(int16_t Weapon, int16_t delay_tics, int16_t aware_range, int16_
 
             if ((hit_sprite = DoPickTarget(sp, aware_range, FALSE)) != -1)
             {
-                SPRITEp hp = &sprite[hit_sprite];
                 USERp hu = User[hit_sprite];
 
                 u->WpnGoal = hit_sprite;
@@ -8471,9 +8431,6 @@ VectorMissileSeek(int16_t Weapon, int16_t delay_tics, int16_t turn_speed, int16_
 
     int dist;
     int zh;
-    short ang2tgt, delta_ang, ang_adj;
-    int ozchange;
-    int zdiff;
 
     SPRITEp hp;
 
@@ -8490,7 +8447,6 @@ VectorMissileSeek(int16_t Weapon, int16_t delay_tics, int16_t turn_speed, int16_
             {
                 if ((hit_sprite = PickEnemyTarget(sp, aware_range1)) != -1)
                 {
-                    SPRITEp hp = &sprite[hit_sprite];
                     USERp hu = User[hit_sprite];
 
                     u->WpnGoal = hit_sprite;
@@ -8499,7 +8455,6 @@ VectorMissileSeek(int16_t Weapon, int16_t delay_tics, int16_t turn_speed, int16_
                 }
                 else if ((hit_sprite = PickEnemyTarget(sp, aware_range2)) != -1)
                 {
-                    SPRITEp hp = &sprite[hit_sprite];
                     USERp hu = User[hit_sprite];
 
                     u->WpnGoal = hit_sprite;
@@ -8511,7 +8466,6 @@ VectorMissileSeek(int16_t Weapon, int16_t delay_tics, int16_t turn_speed, int16_
             {
                 if ((hit_sprite = DoPickTarget(sp, aware_range1, FALSE)) != -1)
                 {
-                    SPRITEp hp = &sprite[hit_sprite];
                     USERp hu = User[hit_sprite];
 
                     u->WpnGoal = hit_sprite;
@@ -8520,7 +8474,6 @@ VectorMissileSeek(int16_t Weapon, int16_t delay_tics, int16_t turn_speed, int16_
                 }
                 else if ((hit_sprite = DoPickTarget(sp, aware_range2, FALSE)) != -1)
                 {
-                    SPRITEp hp = &sprite[hit_sprite];
                     USERp hu = User[hit_sprite];
 
                     u->WpnGoal = hit_sprite;
@@ -8571,9 +8524,6 @@ VectorWormSeek(int16_t Weapon, int16_t delay_tics, int16_t aware_range1, int16_t
 
     int dist;
     int zh;
-    short ang2tgt, delta_ang, ang_adj;
-    int ozchange;
-    int zdiff;
 
     SPRITEp hp;
 
@@ -8588,7 +8538,6 @@ VectorWormSeek(int16_t Weapon, int16_t delay_tics, int16_t aware_range1, int16_t
 
             if ((hit_sprite = DoPickTarget(sp, aware_range1, FALSE)) != -1)
             {
-                SPRITEp hp = &sprite[hit_sprite];
                 USERp hu = User[hit_sprite];
 
                 u->WpnGoal = hit_sprite;
@@ -8597,7 +8546,6 @@ VectorWormSeek(int16_t Weapon, int16_t delay_tics, int16_t aware_range1, int16_t
             }
             else if ((hit_sprite = DoPickTarget(sp, aware_range2, FALSE)) != -1)
             {
-                SPRITEp hp = &sprite[hit_sprite];
                 USERp hu = User[hit_sprite];
 
                 u->WpnGoal = hit_sprite;
@@ -8659,7 +8607,6 @@ DoBlurExtend(int16_t Weapon, int16_t interval, int16_t blur_num)
 int
 InitPlasmaFountain(SPRITEp wp, SPRITEp sp)
 {
-    USERp u = User[sp - sprite];
     SPRITEp np;
     USERp nu;
     short SpriteNum;
@@ -8745,8 +8692,8 @@ DoPlasma(int16_t Weapon)
     oy = sp->y;
     oz = sp->z;
 
-//MissileSeek(int16_t Weapon, int16_t delay_tics, int16_t aware_range, int16_t dang_shift, int16_t turn_limit, int16_t z_limit)
-    //MissileSeek(Weapon, 20, 1024, 6, 80, 6);
+//MissileSeek(int16_t Weapon, int16_t delay_tics, int16_t aware_range/*, int16_t dang_shift, int16_t turn_limit, int16_t z_limit*/)
+    //MissileSeek(Weapon, 20, 1024/*, 6, 80, 6*/);
     DoBlurExtend(Weapon, 0, 4);
 
     dax = MOVEx(sp->xvel, sp->ang);
@@ -8845,7 +8792,6 @@ DoCoolgFire(int16_t Weapon)
 int
 DoEelFire(short Weapon)
 {
-    SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
 
     if (TEST(u->Flags, SPR_UNDERWATER) && (RANDOM_P2(1024 << 4) >> 4) < 256)
@@ -8860,7 +8806,6 @@ DoEelFire(short Weapon)
 void ScaleSpriteVector(short SpriteNum, int scale)
 {
     USERp u = User[SpriteNum];
-    SPRITEp sp = u->SpriteP;
 
     u->xchange = mulscale16(u->xchange, scale);
     u->ychange = mulscale16(u->ychange, scale);
@@ -8987,7 +8932,6 @@ DoGrenade(int16_t Weapon)
 {
     SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
-    int32_t dax, day, daz;
     short i;
 
     if (TEST(u->Flags, SPR_UNDERWATER))
@@ -9023,7 +8967,7 @@ DoGrenade(int16_t Weapon)
             return TRUE;
         case HIT_SPRITE:
         {
-            short wall_ang, dang;
+            short wall_ang;
             short hit_sprite = -2;
             SPRITEp hsp;
 
@@ -9066,7 +9010,7 @@ DoGrenade(int16_t Weapon)
 
         case HIT_WALL:
         {
-            short hit_wall,nw,wall_ang,dang;
+            short hit_wall,nw,wall_ang;
             WALLp wph;
 
             hit_wall = NORM_WALL(u->ret);
@@ -9237,7 +9181,6 @@ DoVulcanBoulder(int16_t Weapon)
 {
     SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
-    int32_t dax, day, daz;
 
     u->Counter += 40;
     u->zchange += u->Counter;
@@ -9263,7 +9206,7 @@ DoVulcanBoulder(int16_t Weapon)
             return TRUE;
         case HIT_SPRITE:
         {
-            short wall_ang, dang;
+            short wall_ang;
             short hit_sprite = -2;
             SPRITEp hsp;
 
@@ -9292,7 +9235,7 @@ DoVulcanBoulder(int16_t Weapon)
 
         case HIT_WALL:
         {
-            short hit_wall,nw,wall_ang,dang;
+            short hit_wall,nw,wall_ang;
             WALLp wph;
 
             hit_wall = NORM_WALL(u->ret);
@@ -9405,7 +9348,6 @@ int
 DoMineRangeTest(short Weapon, short range)
 {
     SPRITEp wp = &sprite[Weapon];
-    USERp wu = User[Weapon];
 
     USERp u;
     SPRITEp sp;
@@ -9821,7 +9763,6 @@ int
 DoRailPuff(short SpriteNum)
 {
     SPRITEp sp = &sprite[SpriteNum];
-    USERp u = User[SpriteNum];
 
     sp->xrepeat += 4;
     sp->yrepeat += 4;
@@ -9835,7 +9776,6 @@ DoBoltThinMan(int16_t Weapon)
     SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
     int32_t dax, day, daz;
-    short NewWeapon;
 
     DoBlurExtend(Weapon, 0, 4);
 
@@ -9874,10 +9814,6 @@ DoTracer(int16_t Weapon)
 {
     SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
-    SPRITEp np;
-    USERp nu;
-    short New;
-    short spawn_count = 0;
     short i;
 
     for (i = 0; i < 4; i++)
@@ -9906,10 +9842,6 @@ DoEMP(int16_t Weapon)
 {
     SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
-    SPRITEp np;
-    USERp nu;
-    short New;
-    short spawn_count = 0;
     short i;
 
     for (i = 0; i < 4; i++)
@@ -10001,12 +9933,7 @@ DoEMPBurst(int16_t Weapon)
 int
 DoTankShell(int16_t Weapon)
 {
-    SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
-    SPRITEp np;
-    USERp nu;
-    short New;
-    short spawn_count = 0;
     short i;
 
     for (i = 0; i < 4; i++)
@@ -10033,13 +9960,7 @@ DoTankShell(int16_t Weapon)
 int
 DoTracerStart(int16_t Weapon)
 {
-    SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
-    SPRITEp np;
-    USERp nu;
-    short New;
-    short spawn_count = 0;
-    short i;
 
     u->ret = move_missile(Weapon, u->xchange, u->ychange, u->zchange,
                           u->ceiling_dist, u->floor_dist, CLIPMASK_MISSILE, MISSILEMOVETICS);
@@ -10110,10 +10031,7 @@ DoLaser(int16_t Weapon)
 int
 DoLaserStart(int16_t Weapon)
 {
-    SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
-    SPRITEp np;
-    USERp nu;
 
     if (SW_SHAREWARE) return FALSE; // JBF: verify
 
@@ -10139,8 +10057,6 @@ DoRail(int16_t Weapon)
 {
     SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
-    int32_t dax, day, daz;
-    short NewWeapon;
     SPRITEp np;
     USERp nu;
     short New;
@@ -10230,12 +10146,7 @@ DoRail(int16_t Weapon)
 int
 DoRailStart(int16_t Weapon)
 {
-    SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
-    int32_t dax, day, daz;
-    SPRITEp np;
-    USERp nu;
-    short New;
 
     if (SW_SHAREWARE) return FALSE; // JBF: verify
 
@@ -10262,8 +10173,6 @@ DoRocket(int16_t Weapon)
 {
     SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
-    int32_t dax, day, daz;
-    short NewWeapon;
     int dist,a,b,c;
 
 
@@ -10277,7 +10186,7 @@ DoRocket(int16_t Weapon)
 
     if (TEST(u->Flags, SPR_FIND_PLAYER))
     {
-        //MissileSeek(Weapon, 10, 768, 3, 48, 6);
+        //MissileSeek(Weapon, 10, 768/*, 3, 48, 6*/);
         VectorMissileSeek(Weapon, 30, 16, 128, 768);
     }
 
@@ -10351,12 +10260,7 @@ DoRocket(int16_t Weapon)
 int
 DoMicroMini(int16_t Weapon)
 {
-    SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
-    SPRITEp np;
-    USERp nu;
-    short New;
-    short spawn_count = 0;
     short i;
 
     for (i = 0; i < 3; i++)
@@ -10423,7 +10327,6 @@ DoMicro(int16_t Weapon)
 {
     SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
-    int32_t dax, day, daz;
     short New;
 
     if (SW_SHAREWARE) return FALSE; // JBF: verify
@@ -10499,11 +10402,10 @@ DoMicro(int16_t Weapon)
 int
 DoUziBullet(int16_t Weapon)
 {
-    SPRITEp sp = &sprite[Weapon], newp;
+    SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
     int32_t dax, day, daz;
     int sx,sy;
-    short NewWeapon;
     short i;
 
     // call move_sprite twice for each movement
@@ -10572,12 +10474,11 @@ DoUziBullet(int16_t Weapon)
 int
 DoBoltSeeker(int16_t Weapon)
 {
-    SPRITEp sp = &sprite[Weapon], newp;
+    SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
     int32_t dax, day, daz;
-    short NewWeapon;
 
-    MissileSeek(Weapon, 30, 768, 4, 48, 6);
+    MissileSeek(Weapon, 30, 768/*, 4, 48, 6*/);
     DoBlurExtend(Weapon, 0, 4);
 
     dax = MOVEx(sp->xvel, sp->ang);
@@ -10620,7 +10521,7 @@ DoBoltFatMan(int16_t Weapon)
 int
 DoElectro(int16_t Weapon)
 {
-    SPRITEp sp = &sprite[Weapon], newp;
+    SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
     int32_t dax, day, daz;
 
@@ -10628,7 +10529,7 @@ DoElectro(int16_t Weapon)
 
     // only seek on Electro's after a hit on an actor
     if (u->Counter > 0)
-        MissileSeek(Weapon, 30, 512, 3, 52, 2);
+        MissileSeek(Weapon, 30, 512/*, 3, 52, 2*/);
 
     dax = MOVEx(sp->xvel, sp->ang);
     day = MOVEy(sp->xvel, sp->ang);
@@ -10677,9 +10578,7 @@ DoElectro(int16_t Weapon)
 int
 DoLavaBoulder(int16_t Weapon)
 {
-    SPRITEp sp = &sprite[Weapon], newp;
     USERp u = User[Weapon];
-    int32_t dax, day, daz;
 
     u->ret = move_missile(Weapon, u->xchange, u->ychange, u->zchange,
                           u->ceiling_dist, u->floor_dist, CLIPMASK_MISSILE, MISSILEMOVETICS);
@@ -10708,9 +10607,7 @@ DoLavaBoulder(int16_t Weapon)
 int
 DoSpear(int16_t Weapon)
 {
-    SPRITEp sp = &sprite[Weapon], newp;
     USERp u = User[Weapon];
-    int32_t dax, day, daz;
 
     u->ret = move_missile(Weapon, u->xchange, u->ychange, u->zchange,
                           u->ceiling_dist, u->floor_dist, CLIPMASK_MISSILE, MISSILEMOVETICS);
@@ -10742,7 +10639,6 @@ int SpawnCoolieExp(short SpriteNum)
 {
     USERp u = User[SpriteNum], eu;
     SPRITEp sp = &sprite[SpriteNum];
-    extern STATE s_BasicExp[];
 
     short explosion;
     SPRITEp exp;
@@ -11177,9 +11073,6 @@ SpawnBunnyExp(int16_t Weapon)
 {
     SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
-    SPRITEp exp;
-    USERp eu;
-    short explosion;
 
     ASSERT(u);
 
@@ -11491,6 +11384,8 @@ AddSpriteToSectorObject(short SpriteNum, SECTOR_OBJECTp sop)
 
     ASSERT(sn < SIZ(sop->sp_num) - 1);
     sop->sp_num[sn] = SpriteNum;
+    if (InterpolateSectObj)
+        setspriteinterpolation(sp);
 
     SET(u->Flags, SPR_ON_SO_SECTOR|SPR_SO_ATTACHED);
 
@@ -11505,11 +11400,11 @@ AddSpriteToSectorObject(short SpriteNum, SECTOR_OBJECTp sop)
 int
 SpawnBigGunFlames(int16_t Weapon, int16_t Operator, SECTOR_OBJECTp sop)
 {
-    SPRITEp sp,shp;
-    USERp u,shu;
+    SPRITEp sp;
+    USERp u;
     SPRITEp exp;
     USERp eu;
-    short explosion,shoot_pt;
+    short explosion;
     unsigned sn;
     SWBOOL smallflames = FALSE;
 
@@ -11557,6 +11452,8 @@ SpawnBigGunFlames(int16_t Weapon, int16_t Operator, SECTOR_OBJECTp sop)
 
     ASSERT(sn < SIZ(sop->sp_num) - 1);
     sop->sp_num[sn] = explosion;
+    if (InterpolateSectObj)
+        setspriteinterpolation(exp);
 
     // Place sprite exactly where shoot point is
     //exp->x = eu->ox = sop->xmid - u->sx;
@@ -11652,7 +11549,6 @@ SpawnGrenadeExp(int16_t Weapon)
     USERp eu;
     short explosion;
     ANIMATOR InitMineShrap;
-    short ang;
     int dx,dy,dz;
 
     ASSERT(u);
@@ -11710,6 +11606,7 @@ SpawnGrenadeExp(int16_t Weapon)
     SpawnVis(-1, exp->sectnum, exp->x, exp->y, exp->z, 0);
 
 #if 0
+    short ang;
     ang = RANDOM_P2(2048);
     SpawnGrenadeSecondaryExp(explosion, ang);
     ang = ang + 512 + RANDOM_P2(256);
@@ -11725,7 +11622,6 @@ SpawnGrenadeExp(int16_t Weapon)
 
 void SpawnExpZadjust(short Weapon, SPRITEp exp, int upper_zsize, int lower_zsize)
 {
-    SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
     USERp eu = User[exp - sprite];
     int tos_z, bos_z;
@@ -11820,13 +11716,10 @@ int
 InitMineShrap(short SpriteNum)
 {
     SPRITEp sp = &sprite[SpriteNum];
-    USERp u = User[SpriteNum];
-    SPRITEp wp, hsp;
-    USERp wu;
+    SPRITEp wp;
     short ang, w, i;
     hitdata_t hitinfo;
-    int daz, nz;
-    int nx,ny;
+    int daz;
 
     for (i = 0; i < 18; i++)
     {
@@ -11852,12 +11745,6 @@ InitMineShrap(short SpriteNum)
 #define MINE_SHRAP_DIST_MAX 20000
         if (Distance(hitinfo.pos.x, hitinfo.pos.y, sp->x, sp->y) > MINE_SHRAP_DIST_MAX)
             continue;
-
-        // hit a sprite?
-        if (hitinfo.sprite >= 0)
-        {
-            hsp = &sprite[hitinfo.sprite];
-        }
 
         w = SpawnSprite(STAT_MISSILE, MINE_SHRAP, s_MineSpark, hitinfo.sect, hitinfo.pos.x, hitinfo.pos.y, hitinfo.pos.z, ang, 0);
         wp = &sprite[w];
@@ -12051,10 +11938,6 @@ DoFireball(int16_t Weapon)
 {
     SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
-    int32_t dax, day, daz;
-    short NewWeapon;
-
-    int offset;
 
     u = User[Weapon];
 
@@ -12147,7 +12030,6 @@ DoFindGround(int16_t SpriteNum)
     USERp u = User[SpriteNum];
     int ceilhit, florhit;
     short save_cstat;
-    SWBOOL found = FALSE;
     short bak_cstat;
 
     // recursive routine to find the ground - either sector or floor sprite
@@ -12207,7 +12089,6 @@ DoFindGroundPoint(int16_t SpriteNum)
     USERp u = User[SpriteNum];
     int ceilhit, florhit;
     short save_cstat;
-    SWBOOL found = FALSE;
     short bak_cstat;
 
     // recursive routine to find the ground - either sector or floor sprite
@@ -12266,7 +12147,6 @@ DoNapalm(int16_t Weapon)
     SPRITEp sp = &sprite[Weapon], exp;
     USERp u = User[Weapon];
     short explosion;
-    int offset;
     int ox, oy, oz;
 
     DoBlurExtend(Weapon, 1, 7);
@@ -12380,12 +12260,11 @@ DoNapalm(int16_t Weapon)
 int
 DoBloodWorm(int16_t Weapon)
 {
-    SPRITEp sp = &sprite[Weapon], exp;
+    SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
-    int offset;
-    int move_ground_missile(short spritenum, int xchange, int ychange, int zchange, int ceildist, int flordist, uint32_t cliptype, int numtics);
+    int move_ground_missile(short spritenum, int xchange, int ychange, int ceildist, int flordist, uint32_t cliptype, int numtics);
     short ang;
-    int x,y,z,xvect,yvect;
+    int xvect,yvect;
     int bx,by;
     int amt;
     int SpawnZombie2(short);
@@ -12393,7 +12272,7 @@ DoBloodWorm(int16_t Weapon)
 
     u = User[Weapon];
 
-    u->ret = move_ground_missile(Weapon, u->xchange, u->ychange, u->zchange, u->ceiling_dist, u->floor_dist, CLIPMASK_MISSILE, MISSILEMOVETICS);
+    u->ret = move_ground_missile(Weapon, u->xchange, u->ychange, u->ceiling_dist, u->floor_dist, CLIPMASK_MISSILE, MISSILEMOVETICS);
 
     if (u->ret)
     {
@@ -12477,7 +12356,7 @@ DoBloodWorm(int16_t Weapon)
     SPRITEp sp = &sprite[Weapon], exp;
     USERp u = User[Weapon];
     int offset;
-    int move_ground_missile(short spritenum, int xchange, int ychange, int zchange, int ceildist, int flordist, uint32_t cliptype, int numtics);
+    int move_ground_missile(short spritenum, int xchange, int ychange, int ceildist, int flordist, uint32_t cliptype, int numtics);
     short ang;
     int x,y,z,xvect,yvect;
     int bx,by;
@@ -12612,10 +12491,8 @@ DoMeteor(int16_t Weapon)
 int
 DoSerpMeteor(int16_t Weapon)
 {
-    SPRITEp sp = &sprite[Weapon], exp;
+    SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
-    short explosion;
-    int offset;
     int ox, oy, oz;
 
     ox = sp->x;
@@ -12672,10 +12549,8 @@ DoSerpMeteor(int16_t Weapon)
 int
 DoMirvMissile(int16_t Weapon)
 {
-    SPRITEp sp = &sprite[Weapon], exp;
+    SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
-    short explosion;
-    int offset;
 
     u = User[Weapon];
 
@@ -12710,14 +12585,13 @@ DoMirv(int16_t Weapon)
     SPRITEp sp = &sprite[Weapon], np;
     USERp u = User[Weapon], nu;
     short New;
-    int offset;
-    int ox, oy, oz;
+//    int ox, oy, oz;
 
     u = User[Weapon];
 
-    ox = sp->x;
-    oy = sp->y;
-    oz = sp->z;
+//    ox = sp->x;
+//    oy = sp->y;
+//    oz = sp->z;
 
     u->ret = move_missile(Weapon, u->xchange, u->ychange, u->zchange, u->ceiling_dist, u->floor_dist, CLIPMASK_MISSILE, MISSILEMOVETICS);
 
@@ -12815,7 +12689,7 @@ MissileSetPos(short Weapon, ANIMATORp DoWeapon, int dist)
 {
     SPRITEp wp = &sprite[Weapon];
     USERp wu = User[Weapon];
-    int oldspeed, oldvel, oldzvel;
+    int oldvel, oldzvel;
     int oldxc, oldyc, oldzc;
     char retval = FALSE;
 
@@ -12861,7 +12735,7 @@ TestMissileSetPos(short Weapon, ANIMATORp DoWeapon, int dist, int zvel)
 {
     SPRITEp wp = &sprite[Weapon];
     USERp wu = User[Weapon];
-    int oldspeed, oldvel, oldzvel;
+    int oldvel, oldzvel;
     int oldxc, oldyc, oldzc;
     char retval = FALSE;
 
@@ -12909,7 +12783,6 @@ DoRing(int16_t Weapon)
     USERp u = User[Weapon];
     PLAYERp pp = User[sp->owner]->PlayerP;
     SPRITEp so = &sprite[sp->owner];
-    short sect;
     int cz,fz;
 
 #define RINGMOVETICS (MISSILEMOVETICS * 2)
@@ -12969,13 +12842,12 @@ DoRing(int16_t Weapon)
     sp->x += ((int) u->Dist * (int) sintable[NORM_ANGLE(sp->ang + 512)]) >> 14;
     sp->y += ((int) u->Dist * (int) sintable[sp->ang]) >> 14;
     if (User[sp->owner]->PlayerP)
-        sp->z += (u->Dist * ((100 - pp->horiz) * HORIZ_MULT)) >> 9;
+        sp->z += (u->Dist * ((100 - fix16_to_int(pp->q16horiz)) * HORIZ_MULT)) >> 9;
 
     //sp->ang = NORM_ANGLE(sp->ang + 512);
     //updatesector(sp->x, sp->y);
 
     setsprite(Weapon, (vec3_t *)sp);
-    sect = sp->sectnum;
 
     ASSERT(sp->sectnum >= 0);
 
@@ -13003,9 +12875,9 @@ DoRing(int16_t Weapon)
 void
 InitSpellRing(PLAYERp pp)
 {
-    short ang, ang_diff, ang_start, ang_finish, SpriteNum, missiles;
+    short ang, ang_diff, ang_start, SpriteNum, missiles;
     SPRITEp sp;
-    USERp u, pu = User[pp->PlayerSprite];
+    USERp u;
     short max_missiles = 16;
     short ammo;
 
@@ -13018,7 +12890,7 @@ InitSpellRing(PLAYERp pp)
 
     ang_diff = 2048 / max_missiles;
 
-    ang_start = NORM_ANGLE(pp->pang - DIV2(2048));
+    ang_start = NORM_ANGLE(fix16_to_int(pp->q16ang) - DIV2(2048));
 
     if (!SW_SHAREWARE)
         PlaySound(DIGI_RFWIZ, &pp->posx, &pp->posy, &pp->posz, v3df_none);
@@ -13057,7 +12929,7 @@ InitSpellRing(PLAYERp pp)
         // put it out there
         sp->x += ((int) u->Dist * (int) sintable[NORM_ANGLE(sp->ang + 512)]) >> 14;
         sp->y += ((int) u->Dist * (int) sintable[sp->ang]) >> 14;
-        sp->z = pp->posz + Z(20) + ((u->Dist * ((100 - pp->horiz) * HORIZ_MULT)) >> 9);
+        sp->z = pp->posz + Z(20) + ((u->Dist * ((100 - fix16_to_int(pp->q16horiz)) * HORIZ_MULT)) >> 9);
 
         sp->ang = NORM_ANGLE(sp->ang + 512);
 
@@ -13076,7 +12948,6 @@ DoSerpRing(int16_t Weapon)
     SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
     USERp ou = User[sp->owner];
-    short sect;
     int dist,a,b,c;
     int cz,fz;
 
@@ -13122,7 +12993,6 @@ DoSerpRing(int16_t Weapon)
     sp->y += ((int) u->Dist * (int) sintable[u->slide_ang]) >> 14;
 
     setsprite(Weapon, (vec3_t *)sp);
-    sect = sp->sectnum;
 
     ASSERT(sp->sectnum >= 0);
 
@@ -13258,8 +13128,8 @@ int
 InitVulcanBoulder(short SpriteNum)
 {
     SPRITEp sp = &sprite[SpriteNum], wp;
-    USERp u = User[SpriteNum], wu;
-    int nx, ny, nz, dist, nang;
+    USERp wu;
+    int nx, ny, nz, nang;
     short w;
     int zsize;
     int zvel, zvel_rand;
@@ -13392,7 +13262,7 @@ InitSerpRing(short SpriteNum)
 {
     SPRITEp sp = User[SpriteNum]->SpriteP, np;
     USERp u = User[SpriteNum], nu;
-    short ang, ang_diff, ang_start, ang_finish, missiles, New;
+    short ang, ang_diff, ang_start, missiles, New;
     short max_missiles;
 
 #define SERP_RING_DIST 2800 // Was 3500
@@ -13550,7 +13420,6 @@ InitSpellNapalm(PLAYERp pp)
     unsigned i;
     short oclipdist;
     short ammo;
-    USERp pu = User[pp->PlayerSprite];
 
     typedef struct
     {
@@ -13580,7 +13449,7 @@ InitSpellNapalm(PLAYERp pp)
     for (i = 0; i < SIZ(mp); i++)
     {
         SpriteNum = SpawnSprite(STAT_MISSILE, FIREBALL1, s_Napalm, pp->cursectnum,
-                                pp->posx, pp->posy, pp->posz + Z(12), pp->pang, NAPALM_VELOCITY*2);
+                                pp->posx, pp->posy, pp->posz + Z(12), fix16_to_int(pp->q16ang), NAPALM_VELOCITY*2);
 
         sp = &sprite[SpriteNum];
         u = User[SpriteNum];
@@ -13599,7 +13468,7 @@ InitSpellNapalm(PLAYERp pp)
         sp->xrepeat = 32;
         sp->yrepeat = 32;
         sp->clipdist = 0;
-        sp->zvel = ((100 - pp->horiz) * HORIZ_MULT);
+        sp->zvel = ((100 - fix16_to_int(pp->q16horiz)) * HORIZ_MULT);
         SET(sp->cstat, CSTAT_SPRITE_TRANSLUCENT | CSTAT_SPRITE_YCENTER);
         RESET(sp->cstat, CSTAT_SPRITE_BLOCK | CSTAT_SPRITE_BLOCK_HITSCAN);
         SET(u->Flags2, SPR2_BLUR_TAPER_FAST);
@@ -13732,7 +13601,6 @@ InitSpellMirv(PLAYERp pp)
     short SpriteNum;
     SPRITEp sp;
     USERp u;
-    short i;
     short oclipdist;
 
     PlaySound(DIGI_MIRVFIRE, &pp->posx, &pp->posy, &pp->posz, v3df_none);
@@ -13741,7 +13609,7 @@ InitSpellMirv(PLAYERp pp)
         return 0;
 
     SpriteNum = SpawnSprite(STAT_MISSILE, FIREBALL1, s_Mirv, pp->cursectnum,
-                            pp->posx, pp->posy, pp->posz + Z(12), pp->pang, MIRV_VELOCITY);
+                            pp->posx, pp->posy, pp->posz + Z(12), fix16_to_int(pp->q16ang), MIRV_VELOCITY);
 
     sp = &sprite[SpriteNum];
     u = User[SpriteNum];
@@ -13755,7 +13623,7 @@ InitSpellMirv(PLAYERp pp)
     sp->xrepeat = 72;
     sp->yrepeat = 72;
     sp->clipdist = 32L >> 2;
-    sp->zvel = ((100 - pp->horiz) * HORIZ_MULT);
+    sp->zvel = ((100 - fix16_to_int(pp->q16horiz)) * HORIZ_MULT);
     SET(sp->cstat, CSTAT_SPRITE_TRANSLUCENT | CSTAT_SPRITE_YCENTER);
     RESET(sp->cstat, CSTAT_SPRITE_BLOCK | CSTAT_SPRITE_BLOCK_HITSCAN);
 
@@ -13783,8 +13651,6 @@ InitEnemyMirv(short SpriteNum)
     SPRITEp sp = &sprite[SpriteNum], wp;
     USERp u = User[SpriteNum], wu;
     short w;
-    short i;
-    short oclipdist;
     int dist;
 
     PlaySound(DIGI_MIRVFIRE, &sp->x, &sp->y, &sp->z, v3df_none);
@@ -13841,7 +13707,6 @@ InitSwordAttack(PLAYERp pp)
     if (TEST(pp->Flags, PF_DIVING))
     {
         short bubble;
-        USERp bu;
         SPRITEp bp;
         int nx,ny;
         short random_amt;
@@ -13857,10 +13722,9 @@ InitSwordAttack(PLAYERp pp)
             bubble = SpawnBubble(pp->SpriteP - sprite);
             if (bubble >= 0)
             {
-                bu = User[bubble];
                 bp = &sprite[bubble];
 
-                bp->ang = pp->pang;
+                bp->ang = fix16_to_int(pp->q16ang);
 
                 random_amt = (RANDOM_P2(32<<8)>>8) - 16;
 
@@ -13909,8 +13773,8 @@ InitSwordAttack(PLAYERp pp)
         short daang;
         int daz;
 
-        daang = pp->pang;
-        daz = ((100 - pp->horiz) * 2000) + (RANDOM_RANGE(24000) - 12000);
+        daang = fix16_to_int(pp->q16ang);
+        daz = ((100 - fix16_to_int(pp->q16horiz)) * 2000) + (RANDOM_RANGE(24000) - 12000);
 
         FAFhitscan(pp->posx, pp->posy, pp->posz, pp->cursectnum,       // Start position
                    sintable[NORM_ANGLE(daang + 512)],      // X vector of 3D ang
@@ -13971,7 +13835,7 @@ InitSwordAttack(PLAYERp pp)
                 // hit a switch?
                 if (TEST(hsp->cstat, CSTAT_SPRITE_ALIGNMENT_WALL) && (hsp->lotag || hsp->hitag))
                 {
-                    ShootableSwitch(hitinfo.sprite,-1);
+                    ShootableSwitch(hitinfo.sprite);
                 }
 
             }
@@ -14021,7 +13885,6 @@ InitFistAttack(PLAYERp pp)
     if (TEST(pp->Flags, PF_DIVING))
     {
         short bubble;
-        USERp bu;
         SPRITEp bp;
         int nx,ny;
         short random_amt;
@@ -14036,10 +13899,9 @@ InitFistAttack(PLAYERp pp)
             bubble = SpawnBubble(pp->SpriteP - sprite);
             if (bubble >= 0)
             {
-                bu = User[bubble];
                 bp = &sprite[bubble];
 
-                bp->ang = pp->pang;
+                bp->ang = fix16_to_int(pp->q16ang);
 
                 random_amt = (RANDOM_P2(32<<8)>>8) - 16;
 
@@ -14101,8 +13963,8 @@ InitFistAttack(PLAYERp pp)
         short daang;
         int daz;
 
-        daang = pp->pang;
-        daz = ((100 - pp->horiz) * 2000) + (RANDOM_RANGE(24000) - 12000);
+        daang = fix16_to_int(pp->q16ang);
+        daz = ((100 - fix16_to_int(pp->q16horiz)) * 2000) + (RANDOM_RANGE(24000) - 12000);
 
         FAFhitscan(pp->posx, pp->posy, pp->posz, pp->cursectnum,       // Start position
                    sintable[NORM_ANGLE(daang + 512)],      // X vector of 3D ang
@@ -14163,7 +14025,7 @@ InitFistAttack(PLAYERp pp)
                 // hit a switch?
                 if (TEST(hsp->cstat, CSTAT_SPRITE_ALIGNMENT_WALL) && (hsp->lotag || hsp->hitag))
                 {
-                    ShootableSwitch(hitinfo.sprite,-1);
+                    ShootableSwitch(hitinfo.sprite);
                 }
 
                 switch (hsp->picnum)
@@ -14307,8 +14169,7 @@ InitSumoSkull(short SpriteNum)
 {
     SPRITEp sp = User[SpriteNum]->SpriteP, np;
     USERp u = User[SpriteNum], nu;
-    short ang, ang_diff, ang_start, ang_finish, missiles, New;
-    short max_missiles;
+    short New;
 
     extern STATE s_SkullExplode[];
     extern STATE s_SkullWait[5][1];
@@ -14362,12 +14223,12 @@ InitSumoSkull(short SpriteNum)
 int
 InitSumoStompAttack(short SpriteNum)
 {
-    USERp u = User[SpriteNum],tu;
+    USERp u = User[SpriteNum];
     SPRITEp sp = &sprite[SpriteNum],tsp;
     short i, nexti;
     unsigned stat;
     int dist;
-    short reach,face;
+    short reach;
 
 
     PlaySound(DIGI_30MMEXPLODE, &sp->x, &sp->y, &sp->z, v3df_dontpan|v3df_doppler);
@@ -14403,10 +14264,9 @@ InitSumoStompAttack(short SpriteNum)
 int
 InitMiniSumoClap(short SpriteNum)
 {
-    SPRITEp sp = &sprite[SpriteNum], wp;
-    USERp u = User[SpriteNum], wu;
-    int nx, ny, nz, dist;
-    short w;
+    SPRITEp sp = &sprite[SpriteNum];
+    USERp u = User[SpriteNum];
+    int dist;
     short reach;
 
 
@@ -14733,9 +14593,8 @@ InitStar(PLAYERp pp)
     USERp u = User[pp->PlayerSprite];
     USERp wu;
     SPRITEp wp;
-    int nx, ny, nz, oldx, oldy, oldspeed;
-    short Weapon, w;
-    int oclipdist;
+    int nx, ny, nz;
+    short w;
     int zvel;
 
     static short dang[] = {-12, 12};
@@ -14744,7 +14603,6 @@ InitStar(PLAYERp pp)
     SPRITEp np;
     USERp nu;
     short nw;
-    SWBOOL AutoAim = FALSE;
 #define STAR_REPEAT  26
 #define STAR_HORIZ_ADJ 100L
     //#define STAR_HORIZ_ADJ 0
@@ -14764,7 +14622,7 @@ InitStar(PLAYERp pp)
     // Spawn a shot
     // Inserting and setting up variables
 
-    w = SpawnSprite(STAT_MISSILE, STAR1, s_Star, pp->cursectnum, nx, ny, nz, pp->pang, STAR_VELOCITY);
+    w = SpawnSprite(STAT_MISSILE, STAR1, s_Star, pp->cursectnum, nx, ny, nz, fix16_to_int(pp->q16ang), STAR_VELOCITY);
     wp = &sprite[w];
     wu = User[w];
 
@@ -14779,7 +14637,7 @@ InitStar(PLAYERp pp)
     wp->clipdist = 32L >> 2;
     // wp->zvel was overflowing with this calculation - had to move to a local
     // long var
-    zvel = ((100 - pp->horiz) * (HORIZ_MULT+STAR_HORIZ_ADJ));
+    zvel = ((100 - fix16_to_int(pp->q16horiz)) * (HORIZ_MULT+STAR_HORIZ_ADJ));
 
     wu->ceiling_dist = Z(1);
     wu->floor_dist = Z(1);
@@ -14801,7 +14659,6 @@ InitStar(PLAYERp pp)
 
     if (WeaponAutoAim(pp->SpriteP, w, 32, FALSE) != -1)
     {
-        AutoAim = TRUE;
         zvel = wp->zvel;
     }
 
@@ -14837,7 +14694,7 @@ InitStar(PLAYERp pp)
         if (TEST(pp->Flags, PF_DIVING) || SpriteInUnderwaterArea(np))
             SET(nu->Flags, SPR_UNDERWATER);
 
-        zvel = ((100 - pp->horiz) * (HORIZ_MULT+STAR_HORIZ_ADJ));
+        zvel = ((100 - fix16_to_int(pp->q16horiz)) * (HORIZ_MULT+STAR_HORIZ_ADJ));
         np->zvel = zvel >> 1;
 
         if (MissileSetPos(nw, DoStar, 1000))
@@ -14870,7 +14727,6 @@ InitHeartAttack(PLAYERp pp)
     USERp u;
     short i = 0;
     short oclipdist;
-    USERp pu = User[pp->PlayerSprite];
 
     typedef struct
     {
@@ -14889,7 +14745,7 @@ InitHeartAttack(PLAYERp pp)
         return;
 
     SpriteNum = SpawnSprite(STAT_MISSILE_SKIP4, BLOOD_WORM, s_BloodWorm, pp->cursectnum,
-                            pp->posx, pp->posy, pp->posz + Z(12), pp->pang, BLOOD_WORM_VELOCITY*2);
+                            pp->posx, pp->posy, pp->posz + Z(12), fix16_to_int(pp->q16ang), BLOOD_WORM_VELOCITY*2);
 
     sp = &sprite[SpriteNum];
     u = User[SpriteNum];
@@ -14902,7 +14758,7 @@ InitHeartAttack(PLAYERp pp)
     sp->xrepeat = 52;
     sp->yrepeat = 52;
     sp->clipdist = 0;
-    sp->zvel = ((100 - pp->horiz) * HORIZ_MULT);
+    sp->zvel = ((100 - fix16_to_int(pp->q16horiz)) * HORIZ_MULT);
     RESET(sp->cstat, CSTAT_SPRITE_BLOCK | CSTAT_SPRITE_BLOCK_HITSCAN);
     SET(u->Flags2, SPR2_DONT_TARGET_OWNER);
     SET(sp->cstat, CSTAT_SPRITE_INVISIBLE);
@@ -14965,7 +14821,7 @@ InitHeartAttack(PLAYERp pp)
         return;
 
     SpriteNum = SpawnSprite(STAT_MISSILE_SKIP4, BLOOD_WORM, s_BloodWorm, pp->cursectnum,
-                            pp->posx, pp->posy, pp->posz + Z(12), pp->pang, BLOOD_WORM_VELOCITY*2);
+                            pp->posx, pp->posy, pp->posz + Z(12), fix16_to_int(pp->q16ang), BLOOD_WORM_VELOCITY*2);
 
     sp = &sprite[SpriteNum];
     u = User[SpriteNum];
@@ -15049,7 +14905,7 @@ int ContinueHitscan(PLAYERp pp, short sectnum, int x, int y, int z, short ang, i
             return 0;
         }
 
-        QueueHole(ang,hitinfo.sect,hitinfo.wall,hitinfo.pos.x,hitinfo.pos.y,hitinfo.pos.z);
+        QueueHole(hitinfo.sect,hitinfo.wall,hitinfo.pos.x,hitinfo.pos.y,hitinfo.pos.z);
     }
 
     // hit a sprite?
@@ -15069,13 +14925,13 @@ int ContinueHitscan(PLAYERp pp, short sectnum, int x, int y, int z, short ang, i
             return 0;
         }
 
-        if (BulletHitSprite(pp->SpriteP, hitinfo.sprite, hitinfo.sect, hitinfo.wall, hitinfo.pos.x, hitinfo.pos.y, hitinfo.pos.z, 0))
+        if (BulletHitSprite(pp->SpriteP, hitinfo.sprite, hitinfo.pos.x, hitinfo.pos.y, hitinfo.pos.z, 0))
             return 0;
 
         // hit a switch?
         if (TEST(hsp->cstat, CSTAT_SPRITE_ALIGNMENT_WALL) && (hsp->lotag || hsp->hitag))
         {
-            ShootableSwitch(hitinfo.sprite,-1);
+            ShootableSwitch(hitinfo.sprite);
         }
     }
 
@@ -15089,16 +14945,14 @@ int
 InitShotgun(PLAYERp pp)
 {
     USERp u = User[pp->PlayerSprite];
-    SPRITEp wp, hsp;
-    USERp wu;
-    short daang,ndaang, i, j, exp;
+    short daang,ndaang, i, j;
     hitdata_t hitinfo;
     short nsect;
     int daz, ndaz;
     int nx,ny,nz;
     int xvect,yvect,zvect;
     short cstat = 0;
-    SPRITEp sp,ep;
+    SPRITEp sp;
 
     PlayerUpdateAmmo(pp, u->WeaponNum, -1);
 
@@ -15128,8 +14982,8 @@ InitShotgun(PLAYERp pp)
     }
     else
     {
-        daz = (100 - pp->horiz) * 2000;
-        daang = pp->pang;
+        daz = (100 - fix16_to_int(pp->q16horiz)) * 2000;
+        daang = fix16_to_int(pp->q16ang);
     }
 
     for (i = 0; i < 12; i++)
@@ -15212,7 +15066,7 @@ InitShotgun(PLAYERp pp)
                 continue;
             }
 
-            QueueHole(ndaang,hitinfo.sect,hitinfo.wall,hitinfo.pos.x,hitinfo.pos.y,hitinfo.pos.z);
+            QueueHole(hitinfo.sect,hitinfo.wall,hitinfo.pos.x,hitinfo.pos.y,hitinfo.pos.z);
         }
 
         // hit a sprite?
@@ -15245,13 +15099,13 @@ InitShotgun(PLAYERp pp)
                 continue;
             }
 
-            if (BulletHitSprite(pp->SpriteP, hitinfo.sprite, hitinfo.sect, hitinfo.wall, hitinfo.pos.x, hitinfo.pos.y, hitinfo.pos.z, SHOTGUN_SMOKE))
+            if (BulletHitSprite(pp->SpriteP, hitinfo.sprite, hitinfo.pos.x, hitinfo.pos.y, hitinfo.pos.z, SHOTGUN_SMOKE))
                 continue;
 
             // hit a switch?
             if (TEST(hsp->cstat, CSTAT_SPRITE_ALIGNMENT_WALL) && (hsp->lotag || hsp->hitag))
             {
-                ShootableSwitch(hitinfo.sprite,-1);
+                ShootableSwitch(hitinfo.sprite);
             }
         }
 
@@ -15291,7 +15145,7 @@ InitLaser(PLAYERp pp)
     // Inserting and setting up variables
 
     w = SpawnSprite(STAT_MISSILE, BOLT_THINMAN_R0, s_Laser, pp->cursectnum,
-                    nx, ny, nz, pp->pang, 300);
+                    nx, ny, nz, fix16_to_int(pp->q16ang), 300);
 
     wp = &sprite[w];
     wu = User[w];
@@ -15304,7 +15158,7 @@ InitLaser(PLAYERp pp)
     wp->clipdist = 64L>>2;
 
     // the slower the missile travels the less of a zvel it needs
-    wp->zvel = ((100 - pp->horiz) * HORIZ_MULT);
+    wp->zvel = ((100 - fix16_to_int(pp->q16horiz)) * HORIZ_MULT);
     wp->zvel /= 4;
 
     wu->WeaponNum = u->WeaponNum;
@@ -15403,7 +15257,7 @@ InitRail(PLAYERp pp)
     // Inserting and setting up variables
 
     w = SpawnSprite(STAT_MISSILE, BOLT_THINMAN_R1, &s_Rail[0][0], pp->cursectnum,
-                    nx, ny, nz, pp->pang, 1200);
+                    nx, ny, nz, fix16_to_int(pp->q16ang), 1200);
 
     wp = &sprite[w];
     wu = User[w];
@@ -15412,7 +15266,7 @@ InitRail(PLAYERp pp)
     wp->yrepeat = 52;
     wp->xrepeat = 52;
     wp->shade = -15;
-    zvel = ((100 - pp->horiz) * (HORIZ_MULT+17));
+    zvel = ((100 - fix16_to_int(pp->q16horiz)) * (HORIZ_MULT+17));
 
     wu->RotNum = 5;
     NewStateGroup(w, &sg_Rail[0]);
@@ -15602,7 +15456,7 @@ InitRocket(PLAYERp pp)
     //nz = pp->posz + pp->bob_z + Z(12);
     nz = pp->posz + pp->bob_z + Z(8);
     w = SpawnSprite(STAT_MISSILE, BOLT_THINMAN_R0, &s_Rocket[0][0], pp->cursectnum,
-                    nx, ny, nz, pp->pang, ROCKET_VELOCITY);
+                    nx, ny, nz, fix16_to_int(pp->q16ang), ROCKET_VELOCITY);
 
     wp = &sprite[w];
     wu = User[w];
@@ -15612,7 +15466,7 @@ InitRocket(PLAYERp pp)
     wp->yrepeat = 90;
     wp->xrepeat = 90;
     wp->shade = -15;
-    zvel = ((100 - pp->horiz) * (HORIZ_MULT+35));
+    zvel = ((100 - fix16_to_int(pp->q16horiz)) * (HORIZ_MULT+35));
 
     wp->clipdist = 64L>>2;
 
@@ -15723,7 +15577,7 @@ InitBunnyRocket(PLAYERp pp)
     //nz = pp->posz + pp->bob_z + Z(12);
     nz = pp->posz + pp->bob_z + Z(8);
     w = SpawnSprite(STAT_MISSILE, BOLT_THINMAN_R4, &s_BunnyRocket[0][0], pp->cursectnum,
-                    nx, ny, nz, pp->pang, ROCKET_VELOCITY);
+                    nx, ny, nz, fix16_to_int(pp->q16ang), ROCKET_VELOCITY);
 
     wp = &sprite[w];
     wu = User[w];
@@ -15733,7 +15587,7 @@ InitBunnyRocket(PLAYERp pp)
     wp->yrepeat = 64;
     wp->xrepeat = 64;
     wp->shade = -15;
-    zvel = ((100 - pp->horiz) * (HORIZ_MULT+35));
+    zvel = ((100 - fix16_to_int(pp->q16horiz)) * (HORIZ_MULT+35));
 
     wp->clipdist = 64L>>2;
 
@@ -15837,7 +15691,7 @@ InitNuke(PLAYERp pp)
     //nz = pp->posz + pp->bob_z + Z(12);
     nz = pp->posz + pp->bob_z + Z(8);
     w = SpawnSprite(STAT_MISSILE, BOLT_THINMAN_R0, &s_Rocket[0][0], pp->cursectnum,
-                    nx, ny, nz, pp->pang, 700);
+                    nx, ny, nz, fix16_to_int(pp->q16ang), 700);
 
     wp = &sprite[w];
     wu = User[w];
@@ -15847,7 +15701,7 @@ InitNuke(PLAYERp pp)
     wp->yrepeat = 128;
     wp->xrepeat = 128;
     wp->shade = -15;
-    zvel = ((100 - pp->horiz) * (HORIZ_MULT-36));
+    zvel = ((100 - fix16_to_int(pp->q16horiz)) * (HORIZ_MULT-36));
     wp->clipdist = 64L>>2;
 
     // Set to red palette
@@ -15900,7 +15754,7 @@ InitNuke(PLAYERp pp)
     wu->ychange = MOVEy(wp->xvel, wp->ang);
     wu->zchange = zvel;
 
-    PlayerDamageSlide(pp, -40, NORM_ANGLE(pp->pang+1024)); // Recoil slide
+    PlayerDamageSlide(pp, -40, NORM_ANGLE(fix16_to_int(pp->q16ang)+1024)); // Recoil slide
 
     return 0;
 }
@@ -15914,7 +15768,6 @@ InitEnemyNuke(short SpriteNum)
     SPRITEp wp;
     int nx, ny, nz;
     short w;
-    short oclipdist;
     int zvel;
 
 
@@ -16036,7 +15889,7 @@ InitMicro(PLAYERp pp)
         {
             hp = NULL;
             hu = NULL;
-            ang = pp->pang;
+            ang = fix16_to_int(pp->q16ang);
         }
 
         nz = pp->posz + pp->bob_z + Z(14);
@@ -16055,7 +15908,7 @@ InitMicro(PLAYERp pp)
         wp->yrepeat = 24;
         wp->xrepeat = 24;
         wp->shade = -15;
-        wp->zvel = ((100 - pp->horiz) * HORIZ_MULT);
+        wp->zvel = ((100 - fix16_to_int(pp->q16horiz)) * HORIZ_MULT);
         wp->clipdist = 64L>>2;
 
         // randomize zvelocity
@@ -16170,7 +16023,6 @@ InitRipperSlash(short SpriteNum)
 int
 InitBunnySlash(short SpriteNum)
 {
-    USERp u = User[SpriteNum], hu;
     SPRITEp sp = User[SpriteNum]->SpriteP;
     SPRITEp hp;
     short i, nexti;
@@ -16184,7 +16036,6 @@ InitBunnySlash(short SpriteNum)
         TRAVERSE_SPRITE_STAT(headspritestat[StatDamageList[stat]], i, nexti)
         {
             hp = &sprite[i];
-            hu = User[i];
 
             if (i == SpriteNum)
                 break;
@@ -16205,7 +16056,6 @@ InitBunnySlash(short SpriteNum)
 int
 InitSerpSlash(short SpriteNum)
 {
-    USERp u = User[SpriteNum], hu;
     SPRITEp sp = User[SpriteNum]->SpriteP;
     SPRITEp hp;
     short i, nexti;
@@ -16219,7 +16069,6 @@ InitSerpSlash(short SpriteNum)
         TRAVERSE_SPRITE_STAT(headspritestat[StatDamageList[stat]], i, nexti)
         {
             hp = &sprite[i];
-            hu = User[i];
 
             if (i == SpriteNum)
                 break;
@@ -16241,7 +16090,7 @@ SWBOOL
 WallSpriteInsideSprite(SPRITEp wsp, SPRITEp sp)
 {
     int x1, y1, x2, y2;
-    int xoff, l, k;
+    int xoff;
     int dax, day;
     int xsiz, mid_dist;
 
@@ -16276,7 +16125,6 @@ WallSpriteInsideSprite(SPRITEp wsp, SPRITEp sp)
 int
 DoBladeDamage(short SpriteNum)
 {
-    USERp u = User[SpriteNum], hu;
     SPRITEp sp = User[SpriteNum]->SpriteP;
     SPRITEp hp;
     short i, nexti;
@@ -16319,7 +16167,7 @@ DoBladeDamage(short SpriteNum)
 int
 DoStaticFlamesDamage(short SpriteNum)
 {
-    USERp u = User[SpriteNum], hu;
+    USERp u = User[SpriteNum];
     SPRITEp sp = User[SpriteNum]->SpriteP;
     SPRITEp hp;
     short i, nexti;
@@ -16364,7 +16212,6 @@ DoStaticFlamesDamage(short SpriteNum)
 int
 InitCoolgBash(short SpriteNum)
 {
-    USERp u = User[SpriteNum],hu;
     SPRITEp sp = User[SpriteNum]->SpriteP;
     SPRITEp hp;
     short i, nexti;
@@ -16402,7 +16249,6 @@ InitCoolgBash(short SpriteNum)
 int
 InitSkelSlash(short SpriteNum)
 {
-    USERp u = User[SpriteNum];
     SPRITEp sp = User[SpriteNum]->SpriteP;
     SPRITEp hp;
     short i, nexti;
@@ -16436,7 +16282,6 @@ InitSkelSlash(short SpriteNum)
 int
 InitGoroChop(short SpriteNum)
 {
-    USERp u = User[SpriteNum];
     SPRITEp sp = User[SpriteNum]->SpriteP;
     SPRITEp hp;
     short i, nexti;
@@ -16471,7 +16316,6 @@ int
 InitHornetSting(short SpriteNum)
 {
     USERp u = User[SpriteNum];
-    SPRITEp sp = User[SpriteNum]->SpriteP;
     short HitSprite = NORM_SPRITE(u->ret);
 
     DoDamage(HitSprite, SpriteNum);
@@ -16486,7 +16330,7 @@ InitSerpSpell(short SpriteNum)
     SPRITEp sp = &sprite[SpriteNum], np;
     USERp u = User[SpriteNum], nu;
     int dist;
-    short New, save_ang, i;
+    short New, i;
     short oclipdist;
 
     static short lat_ang[] =
@@ -16603,7 +16447,7 @@ InitSerpMonstSpell(short SpriteNum)
     SPRITEp sp = &sprite[SpriteNum], np;
     USERp u = User[SpriteNum], nu;
     int dist;
-    short New, save_ang, i;
+    short New, i;
     short oclipdist;
 
     static short lat_ang[] =
@@ -16681,7 +16525,6 @@ int
 DoTeleRipper(short SpriteNum)
 {
     SPRITEp sp = &sprite[SpriteNum];
-    USERp u = User[SpriteNum];
     extern void Ripper2Hatch(short Weapon);
 
     PlaySound(DIGI_ITEM_SPAWN,&sp->x,&sp->y,&sp->z,v3df_none);
@@ -16766,7 +16609,8 @@ InitEnemyRail(short SpriteNum)
     SPRITEp wp;
     int nx, ny, nz, dist, nang;
     short w;
-    short oclipdist,pnum=0;
+    short pnum=0;
+//    short oclipdist;
 
     if (SW_SHAREWARE) return FALSE; // JBF: verify
 
@@ -17261,8 +17105,8 @@ int
 InitCoolgDrip(short SpriteNum)
 {
     SPRITEp sp = &sprite[SpriteNum], wp;
-    USERp u = User[SpriteNum], wu;
-    int nx, ny, nz, dist, nang;
+    USERp wu;
+    int nx, ny, nz;
     short w;
 
     nx = sp->x;
@@ -17295,7 +17139,7 @@ GenerateDrips(short SpriteNum)
 {
     SPRITEp sp = &sprite[SpriteNum], wp;
     USERp u = User[SpriteNum], wu;
-    int nx, ny, nz, dist, nang;
+    int nx, ny, nz;
     short w = 0;
 
     if ((u->WaitTics-=ACTORMOVETICS) <= 0)
@@ -17383,8 +17227,8 @@ int
 InitFireballTrap(short SpriteNum)
 {
     SPRITEp sp = &sprite[SpriteNum], wp;
-    USERp u = User[SpriteNum], wu;
-    int nx, ny, nz, dist;
+    USERp wu;
+    int nx, ny, nz;
     short w;
 
     PlaySound(DIGI_FIREBALL1, &sp->x, &sp->y, &sp->z, v3df_none);
@@ -17421,8 +17265,8 @@ int
 InitBoltTrap(short SpriteNum)
 {
     SPRITEp sp = &sprite[SpriteNum], wp;
-    USERp u = User[SpriteNum], wu;
-    int nx, ny, nz, dist;
+    USERp wu;
+    int nx, ny, nz;
     short w;
 
     PlaySound(DIGI_RIOTFIRE, &sp->x, &sp->y, &sp->z, v3df_none);
@@ -17514,8 +17358,9 @@ int
 InitSpearTrap(short SpriteNum)
 {
     SPRITEp sp = &sprite[SpriteNum], wp;
-    USERp u = User[SpriteNum], wu;
-    int nx, ny, nz, dist;
+    USERp wu;
+    //USERp u = User[SpriteNum];
+    int nx, ny, nz;
     short w;
     //short nang;
 
@@ -17550,7 +17395,7 @@ InitSpearTrap(short SpriteNum)
     //MissileSetPos(w, DoStar, 400);
 
     // find the distance to the target (player)
-    //dist = Distance(wp->x, wp->y, u->tgt_sp->x, u->tgt_sp->y);
+    //int dist = Distance(wp->x, wp->y, u->tgt_sp->x, u->tgt_sp->y);
 
     //if (dist != 0)
     //wu->zchange = wp->zvel = (wp->xvel * (SPRITEp_UPPER(u->tgt_sp) - wp->z)) / dist;
@@ -17581,10 +17426,10 @@ InitTracerUzi(PLAYERp pp)
         return 0;
 
     USERp u = User[pp->PlayerSprite];
-    SPRITEp wp, hsp;
+    SPRITEp wp;
     USERp wu;
 
-    int nx, ny, nz, dist, nang;
+    int nx, ny, nz;
     short w;
     int oclipdist;
 
@@ -17593,14 +17438,14 @@ InitTracerUzi(PLAYERp pp)
     nx = pp->posx;
     ny = pp->posy;
     //nz = pp->posz + pp->bob_z + Z(8);
-    //nz = pp->posz + pp->bob_z + Z(8) + ((100 - pp->horiz) * 72);
-    nz = pp->posz + Z(8) + ((100 - pp->horiz) * 72);
+    //nz = pp->posz + pp->bob_z + Z(8) + ((100 - fix16_to_int(pp->q16horiz)) * 72);
+    nz = pp->posz + Z(8) + ((100 - fix16_to_int(pp->q16horiz)) * 72);
 
     // Spawn a shot
     // Inserting and setting up variables
 
     w = SpawnSprite(STAT_MISSILE, 0, s_Tracer, pp->cursectnum,
-                    nx, ny, nz, pp->pang, TRACER_VELOCITY);
+                    nx, ny, nz, fix16_to_int(pp->q16ang), TRACER_VELOCITY);
 
     wp = &sprite[w];
     wu = User[w];
@@ -17612,7 +17457,7 @@ InitTracerUzi(PLAYERp pp)
     wp->xrepeat = 10;
     wp->shade = -40;
     wp->zvel = 0;
-    //wp->zvel = ((100 - pp->horiz) * HORIZ_MULT);
+    //wp->zvel = ((100 - fix16_to_int(pp->q16horiz)) * HORIZ_MULT);
     wp->clipdist = 32 >> 2;
 
     wu->WeaponNum = u->WeaponNum;
@@ -17639,7 +17484,7 @@ InitTracerUzi(PLAYERp pp)
         return 0;
     }
 
-    wp->zvel = ((100 - pp->horiz) * (wp->xvel/8));
+    wp->zvel = ((100 - fix16_to_int(pp->q16horiz)) * (wp->xvel/8));
 
     pp->SpriteP->clipdist = oclipdist;
 
@@ -17663,12 +17508,11 @@ InitTracerTurret(short SpriteNum, short Operator, int horiz)
 {
     USERp u = User[SpriteNum];
     SPRITEp sp = u->SpriteP;
-    SPRITEp wp, hsp;
+    SPRITEp wp;
     USERp wu;
 
-    int nx, ny, nz, dist, nang;
+    int nx, ny, nz;
     short w;
-    int oclipdist;
 
     nx = sp->x;
     ny = sp->y;
@@ -17722,12 +17566,11 @@ InitTracerAutoTurret(short SpriteNum, short Operator, int xchange, int ychange, 
 {
     USERp u = User[SpriteNum];
     SPRITEp sp = u->SpriteP;
-    SPRITEp wp, hsp;
+    SPRITEp wp;
     USERp wu;
 
-    int nx, ny, nz, dist, nang;
+    int nx, ny, nz;
     short w;
-    int oclipdist;
 
     nx = sp->x;
     ny = sp->y;
@@ -17770,13 +17613,13 @@ InitTracerAutoTurret(short SpriteNum, short Operator, int xchange, int ychange, 
 #endif
 
 int
-BulletHitSprite(SPRITEp sp, short hit_sprite, short hit_sect, short hit_wall, int hit_x, int hit_y, int hit_z, short ID)
+BulletHitSprite(SPRITEp sp, short hit_sprite, int hit_x, int hit_y, int hit_z, short ID)
 {
     vec3_t hit_pos = { hit_x, hit_y, hit_z };
     SPRITEp hsp = &sprite[hit_sprite];
     USERp hu = User[hit_sprite];
     SPRITEp wp;
-    USERp wu;
+//    USERp wu;
     short New;
     short id;
 
@@ -17797,7 +17640,7 @@ BulletHitSprite(SPRITEp sp, short hit_sprite, short hit_sect, short hit_wall, in
 
         New = SpawnSprite(STAT_MISSILE, id, s_UziSmoke, 0, hit_x, hit_y, hit_z, sp->ang, 0);
         wp = &sprite[New];
-        wu = User[New];
+//        wu = User[New];
         wp->shade = -40;
 
         if (hu->PlayerP)
@@ -17859,9 +17702,8 @@ BulletHitSprite(SPRITEp sp, short hit_sprite, short hit_sect, short hit_wall, in
 
 int SpawnWallHole(short hit_sect, short hit_wall, int hit_x, int hit_y, int hit_z)
 {
-    short w,nw,wall_ang,dang;
+    short w,nw,wall_ang;
     short SpriteNum;
-    int nx,ny;
     SPRITEp sp;
 
     SpriteNum = COVERinsertsprite(hit_sect, STAT_DEFAULT);
@@ -17884,8 +17726,9 @@ int SpawnWallHole(short hit_sect, short hit_wall, int hit_x, int hit_y, int hit_
 
     sp->ang = NORM_ANGLE(wall_ang + 1024);
 
-    //nx = (sintable[(512 + Player[0].pang) & 2047] >> 7);
-    //ny = (sintable[Player[0].pang] >> 7);
+//    int nx,ny;
+    //nx = (sintable[(512 + fix16_to_int(Player[0].q16ang)) & 2047] >> 7);
+    //ny = (sintable[fix16_to_int(Player[0].q16ang)] >> 7);
     //sp->x -= nx;
     //sp->y -= ny;
 
@@ -17944,7 +17787,6 @@ InitUzi(PLAYERp pp)
     short daang, j;
     hitdata_t hitinfo;
     int daz, nz;
-    int nx,ny;
     int xvect,yvect,zvect;
     short cstat = 0;
     uint8_t pal = 0;
@@ -17992,9 +17834,9 @@ InitUzi(PLAYERp pp)
     }
     else
     {
-        //daang = NORM_ANGLE(pp->pang + (RANDOM_RANGE(50) - 25));
-        daang = NORM_ANGLE(pp->pang + (RANDOM_RANGE(24) - 12));
-        daz = ((100 - pp->horiz) * 2000) + (RANDOM_RANGE(24000) - 12000);
+        //daang = NORM_ANGLE(fix16_to_int(pp->q16ang) + (RANDOM_RANGE(50) - 25));
+        daang = NORM_ANGLE(fix16_to_int(pp->q16ang) + (RANDOM_RANGE(24) - 12));
+        daz = ((100 - fix16_to_int(pp->q16horiz)) * 2000) + (RANDOM_RANGE(24000) - 12000);
     }
 
 
@@ -18068,7 +17910,7 @@ InitUzi(PLAYERp pp)
             return 0;
         }
 
-        QueueHole(daang,hitinfo.sect,hitinfo.wall,hitinfo.pos.x,hitinfo.pos.y,hitinfo.pos.z);
+        QueueHole(hitinfo.sect,hitinfo.wall,hitinfo.pos.x,hitinfo.pos.y,hitinfo.pos.z);
     }
 
     // hit a sprite?
@@ -18101,13 +17943,13 @@ InitUzi(PLAYERp pp)
             return 0;
         }
 
-        if (BulletHitSprite(pp->SpriteP, hitinfo.sprite, hitinfo.sect, hitinfo.wall, hitinfo.pos.x, hitinfo.pos.y, hitinfo.pos.z, 0))
+        if (BulletHitSprite(pp->SpriteP, hitinfo.sprite, hitinfo.pos.x, hitinfo.pos.y, hitinfo.pos.z, 0))
             return 0;
 
         // hit a switch?
         if (TEST(hsp->cstat, CSTAT_SPRITE_ALIGNMENT_WALL) && (hsp->lotag || hsp->hitag))
         {
-            ShootableSwitch(hitinfo.sprite,-1);
+            ShootableSwitch(hitinfo.sprite);
         }
     }
 
@@ -18158,9 +18000,7 @@ InitEMP(PLAYERp pp)
     short daang, j;
     hitdata_t hitinfo;
     int daz, nz;
-    int nx,ny;
     short cstat = 0;
-    uint8_t pal = 0;
 
     if (SW_SHAREWARE) return FALSE; // JBF: verify
 
@@ -18171,8 +18011,8 @@ InitEMP(PLAYERp pp)
 
     InitTracerUzi(pp);
 
-    //daz = nz = pp->posz + Z(8) + ((100 - pp->horiz) * 72);
-    //daang = NORM_ANGLE(pp->pang + (RANDOM_RANGE(50) - 25));
+    //daz = nz = pp->posz + Z(8) + ((100 - fix16_to_int(pp->q16horiz)) * 72);
+    //daang = NORM_ANGLE(fix16_to_int(pp->q16ang) + (RANDOM_RANGE(50) - 25));
 
     daz = nz = pp->posz + pp->bob_z;
     daang = 64;
@@ -18181,8 +18021,8 @@ InitEMP(PLAYERp pp)
     }
     else
     {
-        daz = (100 - pp->horiz) * 2000;
-        daang = pp->pang;
+        daz = (100 - fix16_to_int(pp->q16horiz)) * 2000;
+        daang = fix16_to_int(pp->q16ang);
     }
 
     FAFhitscan(pp->posx, pp->posy, nz, pp->cursectnum,       // Start position
@@ -18280,13 +18120,13 @@ InitEMP(PLAYERp pp)
             //return(0);
         }
 
-        if (BulletHitSprite(pp->SpriteP, hitinfo.sprite, hitinfo.sect, hitinfo.wall, hitinfo.pos.x, hitinfo.pos.y, hitinfo.pos.z,0))
+        if (BulletHitSprite(pp->SpriteP, hitinfo.sprite, hitinfo.pos.x, hitinfo.pos.y, hitinfo.pos.z,0))
             //return(0);
 
             // hit a switch?
             if (TEST(hsp->cstat, CSTAT_SPRITE_ALIGNMENT_WALL) && (hsp->lotag || hsp->hitag))
             {
-                ShootableSwitch(hitinfo.sprite,-1);
+                ShootableSwitch(hitinfo.sprite);
             }
 
         if (TEST(hsp->extra, SPRX_PLAYER_OR_ENEMY))
@@ -18327,9 +18167,8 @@ InitTankShell(short SpriteNum, PLAYERp pp)
 {
     USERp u = User[SpriteNum];
     SPRITEp sp = u->SpriteP;
-    SPRITEp wp, hsp;
+    SPRITEp wp;
     USERp wu;
-    int dist, nang;
     short w;
 
     if (!SW_SHAREWARE)
@@ -18356,7 +18195,7 @@ InitTankShell(short SpriteNum, PLAYERp pp)
     SET(wp->cstat, CSTAT_SPRITE_YCENTER);
     SET(wp->cstat, CSTAT_SPRITE_INVISIBLE);
 
-    wp->zvel = ((100 - pp->horiz) * (wp->xvel/8));
+    wp->zvel = ((100 - fix16_to_int(pp->q16horiz)) * (wp->xvel/8));
 
     WeaponAutoAim(sp, w, 64, FALSE);
     // a bit of randomness
@@ -18385,7 +18224,6 @@ InitTurretMicro(short SpriteNum, PLAYERp pp)
     SPRITEp wp,hp;
     int nx, ny, nz, dist;
     short w;
-    short oclipdist;
     short i,ang;
     TARGET_SORTp ts = TargetSort;
 
@@ -18436,7 +18274,7 @@ InitTurretMicro(short SpriteNum, PLAYERp pp)
         wp->yrepeat = 24;
         wp->xrepeat = 24;
         wp->shade = -15;
-        wp->zvel = ((100 - pp->horiz) * HORIZ_MULT);
+        wp->zvel = ((100 - fix16_to_int(pp->q16horiz)) * HORIZ_MULT);
         wp->clipdist = 64L>>2;
 
         // randomize zvelocity
@@ -18490,9 +18328,8 @@ InitTurretRocket(short SpriteNum, PLAYERp pp)
 {
     USERp u = User[SpriteNum];
     SPRITEp sp = u->SpriteP;
-    SPRITEp wp, hsp;
+    SPRITEp wp;
     USERp wu;
-    int dist, nang;
     short w;
 
     if (SW_SHAREWARE) return FALSE; // JBF: verify
@@ -18518,7 +18355,7 @@ InitTurretRocket(short SpriteNum, PLAYERp pp)
     SET(wu->Flags2, SPR2_SO_MISSILE);
     SET(wp->cstat, CSTAT_SPRITE_YCENTER);
 
-    wp->zvel = ((100 - pp->horiz) * (wp->xvel/8));
+    wp->zvel = ((100 - fix16_to_int(pp->q16horiz)) * (wp->xvel/8));
 
     WeaponAutoAim(sp, w, 64, FALSE);
     // a bit of randomness
@@ -18539,9 +18376,8 @@ InitTurretFireball(short SpriteNum, PLAYERp pp)
 {
     USERp u = User[SpriteNum];
     SPRITEp sp = u->SpriteP;
-    SPRITEp wp, hsp;
+    SPRITEp wp;
     USERp wu;
-    int dist, nang;
     short w;
 
     if (SW_SHAREWARE) return FALSE; // JBF: verify
@@ -18566,7 +18402,7 @@ InitTurretFireball(short SpriteNum, PLAYERp pp)
     SET(wu->Flags2, SPR2_SO_MISSILE);
     SET(wp->cstat, CSTAT_SPRITE_YCENTER);
 
-    wp->zvel = ((100 - pp->horiz) * (wp->xvel/8));
+    wp->zvel = ((100 - fix16_to_int(pp->q16horiz)) * (wp->xvel/8));
 
     WeaponAutoAim(sp, w, 64, FALSE);
     // a bit of randomness
@@ -18592,7 +18428,6 @@ InitTurretRail(short SpriteNum, PLAYERp pp)
     SPRITEp wp;
     int nx, ny, nz;
     short w;
-    short oclipdist;
 
     if (SW_SHAREWARE) return FALSE; // JBF: verify
 
@@ -18616,7 +18451,7 @@ InitTurretRail(short SpriteNum, PLAYERp pp)
     wp->yrepeat = 52;
     wp->xrepeat = 52;
     wp->shade = -15;
-    wp->zvel = ((100 - pp->horiz) * HORIZ_MULT);
+    wp->zvel = ((100 - fix16_to_int(pp->q16horiz)) * HORIZ_MULT);
 
     wu->RotNum = 5;
     NewStateGroup(w, &sg_Rail[0]);
@@ -18651,7 +18486,6 @@ InitTurretLaser(short SpriteNum, PLAYERp pp)
     SPRITEp wp;
     int nx, ny, nz;
     short w;
-    short oclipdist;
 
     if (SW_SHAREWARE) return FALSE; // JBF: verify
 
@@ -18677,7 +18511,7 @@ InitTurretLaser(short SpriteNum, PLAYERp pp)
     wp->shade = -15;
 
     // the slower the missile travels the less of a zvel it needs
-    wp->zvel = ((100 - pp->horiz) * HORIZ_MULT);
+    wp->zvel = ((100 - fix16_to_int(pp->q16horiz)) * HORIZ_MULT);
     wp->zvel /= 4;
 
     wu->Radius = 200;
@@ -18705,9 +18539,7 @@ InitSobjMachineGun(short SpriteNum, PLAYERp pp)
 {
     USERp u = User[SpriteNum];
     SPRITEp sp = u->SpriteP;
-    SPRITEp wp, hsp;
-    USERp wu;
-    short daang, i, j, exp;
+    short daang;
     hitdata_t hitinfo;
     short nsect;
     int daz;
@@ -18726,7 +18558,7 @@ InitSobjMachineGun(short SpriteNum, PLAYERp pp)
     nsect = sp->sectnum;
 
     if (RANDOM_P2(1024) < 200)
-        InitTracerTurret(sp - sprite, pp->PlayerSprite, pp->horiz);
+        InitTracerTurret(sp - sprite, pp->PlayerSprite, fix16_to_int(pp->q16horiz));
 
     daang = 64;
     if (WeaponAutoAimHitscan(sp, &daz, &daang, FALSE) != -1)
@@ -18737,7 +18569,7 @@ InitSobjMachineGun(short SpriteNum, PLAYERp pp)
     else
     {
         int horiz;
-        horiz = pp->horiz;
+        horiz = fix16_to_int(pp->q16horiz);
         if (horiz < 75)
             horiz = 75;
 
@@ -18800,13 +18632,13 @@ InitSobjMachineGun(short SpriteNum, PLAYERp pp)
             return 0;
         }
 
-        if (BulletHitSprite(pp->SpriteP, hitinfo.sprite, hitinfo.sect, hitinfo.wall, hitinfo.pos.x, hitinfo.pos.y, hitinfo.pos.z, 0))
+        if (BulletHitSprite(pp->SpriteP, hitinfo.sprite, hitinfo.pos.x, hitinfo.pos.y, hitinfo.pos.z, 0))
             return 0;
 
         // hit a switch?
         if (TEST(hsp->cstat, CSTAT_SPRITE_ALIGNMENT_WALL) && (hsp->lotag || hsp->hitag))
         {
-            ShootableSwitch(hitinfo.sprite,-1);
+            ShootableSwitch(hitinfo.sprite);
         }
     }
 
@@ -18819,7 +18651,6 @@ InitSobjMachineGun(short SpriteNum, PLAYERp pp)
 int
 InitSobjGun(PLAYERp pp)
 {
-    USERp u = User[pp->PlayerSprite];
     short i;
     SPRITEp sp;
     SWBOOL first = FALSE;
@@ -18928,9 +18759,7 @@ InitSobjGun(PLAYERp pp)
 int
 SpawnBoatSparks(PLAYERp pp, short hit_sect, short hit_wall, int hit_x, int hit_y, int hit_z, short hit_ang)
 {
-    USERp u = User[pp->PlayerSprite];
     short j;
-    int nx,ny;
     SPRITEp wp;
     USERp wu;
 
@@ -18975,7 +18804,6 @@ SpawnSwordSparks(PLAYERp pp, short hit_sect, short hit_wall, int hit_x, int hit_
 {
     USERp u = User[pp->PlayerSprite];
     short j;
-    int nx,ny;
     SPRITEp wp;
     USERp wu;
 
@@ -19015,11 +18843,10 @@ SpawnSwordSparks(PLAYERp pp, short hit_sect, short hit_wall, int hit_x, int hit_
 }
 
 int
-SpawnTurretSparks(SPRITEp sp, short hit_sect, short hit_wall, int hit_x, int hit_y, int hit_z, short hit_ang)
+SpawnTurretSparks(/*SPRITEp sp, */short hit_sect, short hit_wall, int hit_x, int hit_y, int hit_z, short hit_ang)
 {
     //USERp u = User[sp - sprite];
     short j;
-    int nx,ny;
     SPRITEp wp;
     USERp wu;
 
@@ -19058,9 +18885,7 @@ SpawnTurretSparks(SPRITEp sp, short hit_sect, short hit_wall, int hit_x, int hit
 int
 SpawnShotgunSparks(PLAYERp pp, short hit_sect, short hit_wall, int hit_x, int hit_y, int hit_z, short hit_ang)
 {
-    USERp u = User[pp->PlayerSprite];
     short j;
-    int nx,ny;
     SPRITEp wp;
     USERp wu;
 
@@ -19100,16 +18925,15 @@ SpawnShotgunSparks(PLAYERp pp, short hit_sect, short hit_wall, int hit_x, int hi
 int
 InitTurretMgun(SECTOR_OBJECTp sop)
 {
-    SPRITEp wp, hsp;
-    USERp wu;
-    short daang, i, j, exp;
+    SPRITEp hsp;
+    short daang, i, j;
     hitdata_t hitinfo;
     short nsect;
     int daz;
     int nx,ny,nz;
     short cstat = 0;
     short delta;
-    SPRITEp sp,ep;
+    SPRITEp sp;
     int xvect,yvect,zvect;
 
     PlaySound(DIGI_BOATFIRE, &sop->xmid, &sop->ymid, &sop->zmid, v3df_dontpan|v3df_doppler);
@@ -19223,7 +19047,7 @@ InitTurretMgun(SECTOR_OBJECTp sop)
                     continue;
                 }
 
-                QueueHole(daang,hitinfo.sect,hitinfo.wall,hitinfo.pos.x,hitinfo.pos.y,hitinfo.pos.z);
+                QueueHole(hitinfo.sect,hitinfo.wall,hitinfo.pos.x,hitinfo.pos.y,hitinfo.pos.z);
             }
 
             // hit a sprite?
@@ -19243,18 +19067,18 @@ InitTurretMgun(SECTOR_OBJECTp sop)
                     continue;
                 }
 
-                if (BulletHitSprite(sp, hitinfo.sprite, hitinfo.sect, hitinfo.wall, hitinfo.pos.x, hitinfo.pos.y, hitinfo.pos.z, 0))
+                if (BulletHitSprite(sp, hitinfo.sprite, hitinfo.pos.x, hitinfo.pos.y, hitinfo.pos.z, 0))
                     continue;
 
                 // hit a switch?
                 if (TEST(hsp->cstat, CSTAT_SPRITE_ALIGNMENT_WALL) && (hsp->lotag || hsp->hitag))
                 {
-                    ShootableSwitch(hitinfo.sprite,-1);
+                    ShootableSwitch(hitinfo.sprite);
                 }
             }
 
 
-            j = SpawnTurretSparks(sp, hitinfo.sect, hitinfo.wall, hitinfo.pos.x, hitinfo.pos.y, hitinfo.pos.z, daang);
+            j = SpawnTurretSparks(/*sp, */hitinfo.sect, hitinfo.wall, hitinfo.pos.x, hitinfo.pos.y, hitinfo.pos.z, daang);
             DoHitscanDamage(j, hitinfo.sprite);
         }
     }
@@ -19269,9 +19093,8 @@ InitEnemyUzi(short SpriteNum)
     SPRITEp sp = User[SpriteNum]->SpriteP,wp;
     USERp u = User[SpriteNum];
     USERp wu;
-    short daang, j, sectnum;
+    short daang, j;
     hitdata_t hitinfo = { { -2, -2, -2 }, -2, -2, -2 };
-    int ret = -2;
     int daz;
     int zh;
     void InitUziShell(PLAYERp);
@@ -19361,12 +19184,12 @@ InitEnemyUzi(short SpriteNum)
             return 0;
         }
 
-        QueueHole(daang,hitinfo.sect,hitinfo.wall,hitinfo.pos.x,hitinfo.pos.y,hitinfo.pos.z);
+        QueueHole(hitinfo.sect,hitinfo.wall,hitinfo.pos.x,hitinfo.pos.y,hitinfo.pos.z);
     }
 
     if (hitinfo.sprite >= 0)
     {
-        if (BulletHitSprite(sp, hitinfo.sprite, hitinfo.sect, hitinfo.wall, hitinfo.pos.x, hitinfo.pos.y, hitinfo.pos.z, 0))
+        if (BulletHitSprite(sp, hitinfo.sprite, hitinfo.pos.x, hitinfo.pos.y, hitinfo.pos.z, 0))
             return 0;
     }
 
@@ -19433,7 +19256,6 @@ InitGrenade(PLAYERp pp)
     int nx, ny, nz;
     short w;
     short oclipdist;
-    int dist;
     int zvel;
     SWBOOL auto_aim = FALSE;
 
@@ -19457,7 +19279,7 @@ InitGrenade(PLAYERp pp)
     // Inserting and setting up variables
 
     w = SpawnSprite(STAT_MISSILE, GRENADE, &s_Grenade[0][0], pp->cursectnum,
-                    nx, ny, nz, pp->pang, GRENADE_VELOCITY);
+                    nx, ny, nz, fix16_to_int(pp->q16ang), GRENADE_VELOCITY);
 
     wp = &sprite[w];
     wu = User[w];
@@ -19489,9 +19311,9 @@ InitGrenade(PLAYERp pp)
     if (TEST(pp->Flags, PF_DIVING) || SpriteInUnderwaterArea(wp))
         SET(wu->Flags, SPR_UNDERWATER);
 
-    wp->zvel = ((100 - pp->horiz) * HORIZ_MULT);
+    wp->zvel = ((100 - fix16_to_int(pp->q16horiz)) * HORIZ_MULT);
 
-    ////DSPRINTF(ds,"horiz %d, ho %d, ho+ho %d",pp->horiz, pp->horizoff, pp->horizoff + pp->horiz);
+    ////DSPRINTF(ds,"horiz %d, ho %d, ho+ho %d",fix16_to_int(pp->q16horiz), fix16_to_int(pp->q16horizoff), fix16_to_int(pp->q16horizoff + pp->q16horiz));
     //MONO_PRINT(ds);
 
     oclipdist = pp->SpriteP->clipdist;
@@ -19508,6 +19330,7 @@ InitGrenade(PLAYERp pp)
 
     pp->SpriteP->clipdist = oclipdist;
 
+//    int dist;
     //dist = FindDistance2D(pp->xvect, pp->yvect)>>12;
     //dist = dist - (dist/2);
 
@@ -19543,8 +19366,6 @@ InitSpriteGrenade(short SpriteNum)
     SPRITEp wp;
     int nx, ny, nz;
     short w;
-    short oclipdist;
-    int dist;
 
 
     PlaySound(DIGI_30MMFIRE, &sp->x, &sp->y, &sp->z, v3df_dontpan|v3df_doppler);
@@ -19610,7 +19431,6 @@ InitMine(PLAYERp pp)
     SPRITEp wp;
     int nx, ny, nz;
     short w;
-    int dist;
     int dot;
 
     PlayerUpdateAmmo(pp, u->WeaponNum, -1);
@@ -19628,7 +19448,7 @@ InitMine(PLAYERp pp)
     // Inserting and setting up variables
 
     w = SpawnSprite(STAT_MISSILE, MINE, s_Mine, pp->cursectnum,
-                    nx, ny, nz, pp->pang, MINE_VELOCITY);
+                    nx, ny, nz, fix16_to_int(pp->q16ang), MINE_VELOCITY);
 
     wp = &sprite[w];
     wu = User[w];
@@ -19638,7 +19458,7 @@ InitMine(PLAYERp pp)
     wp->xrepeat = 32;
     wp->shade = -15;
     wp->clipdist = 128L>>2;
-    wp->zvel = ((100 - pp->horiz) * HORIZ_MULT);
+    wp->zvel = ((100 - fix16_to_int(pp->q16horiz)) * HORIZ_MULT);
     wu->WeaponNum = u->WeaponNum;
     wu->Radius = 200;
     wu->ceiling_dist = Z(5);
@@ -19651,7 +19471,7 @@ InitMine(PLAYERp pp)
     if (TEST(pp->Flags, PF_DIVING) || SpriteInUnderwaterArea(wp))
         SET(wu->Flags, SPR_UNDERWATER);
 
-    //wp->zvel = ((100 - pp->horiz) * HORIZ_MULT);
+    //wp->zvel = ((100 - fix16_to_int(pp->q16horiz)) * HORIZ_MULT);
 
     MissileSetPos(w, DoMine, 800);
 
@@ -19659,7 +19479,7 @@ InitMine(PLAYERp pp)
     wu->xchange = MOVEx(wp->xvel, wp->ang);
     wu->ychange = MOVEy(wp->xvel, wp->ang);
 
-    dot = DOT_PRODUCT_2D(pp->xvect, pp->yvect, sintable[NORM_ANGLE(pp->pang+512)], sintable[pp->pang]);
+    dot = DOT_PRODUCT_2D(pp->xvect, pp->yvect, sintable[NORM_ANGLE(fix16_to_int(pp->q16ang)+512)], sintable[fix16_to_int(pp->q16ang)]);
 
     // don't adjust for strafing
     if (labs(dot) > 10000)
@@ -19681,10 +19501,6 @@ InitEnemyMine(short SpriteNum)
     SPRITEp wp;
     int nx, ny, nz;
     short w;
-    int dist;
-    int dot;
-    int dx,dy,dz;
-    int tvel;
 
 
     PlaySound(DIGI_MINETHROW, &sp->x, &sp->y, &sp->z, v3df_dontpan|v3df_doppler);
@@ -19706,18 +19522,6 @@ InitEnemyMine(short SpriteNum)
     wp->xrepeat = 32;
     wp->shade = -15;
     wp->clipdist = 128L>>2;
-
-    // set dx,dy,dz up for finding the z magnitude
-    dx = sp->x;
-    dy = sp->y;
-    dz = sp->z;
-
-    // find the distance to the target (player)
-    dist = DIST(dx, dy, u->tgt_sp->x, u->tgt_sp->y);
-
-    // (velocity * difference between the target and the object) /
-    // distance
-    tvel = -((((MINE_VELOCITY) *(wp->z - dz)) / dist)*128);
 
     wu->WeaponNum = u->WeaponNum;
     wu->Radius = 200;
@@ -19749,7 +19553,6 @@ HelpMissileLateral(int16_t Weapon, int dist)
 {
     SPRITEp sp = &sprite[Weapon];
     USERp u = User[Weapon];
-    int x, y;
     int xchange, ychange;
     short old_xvel;
     short old_clipdist;
@@ -19762,8 +19565,6 @@ HelpMissileLateral(int16_t Weapon, int dist)
     ychange = MOVEy(sp->xvel, sp->ang);
 
     sp->clipdist = 32L >> 2;
-    x = sp->x;
-    y = sp->y;
 
     //u->ret = move_missile(Weapon, xchange, ychange, 0, Z(16), Z(16), CLIPMASK_MISSILE, 1);
     u->ret = move_missile(Weapon, xchange, ychange, 0, Z(16), Z(16), 0, 1);
@@ -19787,8 +19588,8 @@ InitFireball(PLAYERp pp)
 {
     USERp u = User[pp->PlayerSprite];
     SPRITEp wp;
-    int nx = 0, ny = 0, nz, oldx, oldy, oldspeed;
-    short new_angle, w;
+    int nx = 0, ny = 0, nz;
+    short w;
     USERp wu;
     short oclipdist;
     int zvel;
@@ -19808,7 +19609,7 @@ InitFireball(PLAYERp pp)
 
     nz = pp->posz + pp->bob_z + Z(15);
 
-    w = SpawnSprite(STAT_MISSILE, FIREBALL1, s_Fireball, pp->cursectnum, nx, ny, nz, pp->pang, FIREBALL_VELOCITY);
+    w = SpawnSprite(STAT_MISSILE, FIREBALL1, s_Fireball, pp->cursectnum, nx, ny, nz, fix16_to_int(pp->q16ang), FIREBALL_VELOCITY);
     wp = &sprite[w];
     wu = User[w];
 
@@ -19823,8 +19624,8 @@ InitFireball(PLAYERp pp)
 
     wu->ceiling_dist = Z(6);
     wu->floor_dist = Z(6);
-    //zvel = ((100 - pp->horiz) * (100+ADJUST));
-    zvel = ((100 - pp->horiz) * (240L));
+    //zvel = ((100 - fix16_to_int(pp->q16horiz)) * (100+ADJUST));
+    zvel = ((100 - fix16_to_int(pp->q16horiz)) * (240L));
 
     //wu->RotNum = 5;
     //NewStateGroup(w, &sg_Fireball);
@@ -19868,14 +19669,14 @@ int
 InitEnemyFireball(short SpriteNum)
 {
     SPRITEp sp = User[SpriteNum]->SpriteP, fp = NULL;
-    USERp u = User[SpriteNum], fu;
+    USERp u = User[SpriteNum];
     SPRITEp wp;
     int nz, dist;
     int size_z;
-    short new_angle, w;
+    short w;
     USERp wu;
     SPRITEp tsp;
-    int i, targ_z, zvel=0, xchange, ychange, zchange;
+    int i, targ_z, xchange, ychange;
 
     static short lat_ang[] =
     {
@@ -19929,7 +19730,6 @@ InitEnemyFireball(short SpriteNum)
         {
             // back up first one
             fp = wp;
-            fu = wu;
 
             // find the distance to the target (player)
             dist = ksqrt(SQ(wp->x - tsp->x) + SQ(wp->y - tsp->y));
@@ -20382,7 +20182,6 @@ MissileHitDiveArea(short SpriteNum)
 {
     USERp u = User[SpriteNum];
     SPRITEp sp = User[SpriteNum]->SpriteP;
-    SECTORp sectp;
 
     // correctly set underwater bit for missiles
     // in Stacked water areas.
@@ -20448,7 +20247,7 @@ int
 SpawnBubble(short SpriteNum)
 {
     SPRITEp sp = &sprite[SpriteNum], bp;
-    USERp u = User[SpriteNum], bu;
+    USERp bu;
     short b;
 
     if (Prediction)
@@ -20496,7 +20295,6 @@ int
 DoWaterSmoke(short SpriteNum)
 {
     SPRITEp sp = &sprite[SpriteNum];
-    USERp u = User[SpriteNum];
 
     sp->z -= sp->zvel;
 
@@ -20507,7 +20305,7 @@ int
 SpawnVehicleSmoke(short SpriteNum)
 {
     SPRITEp sp = &sprite[SpriteNum],np;
-    USERp u = User[SpriteNum],nu;
+    USERp nu;
     short New;
 
     if (MoveSkip2 != 0)
@@ -20544,7 +20342,7 @@ int
 SpawnSmokePuff(short SpriteNum)
 {
     SPRITEp sp = &sprite[SpriteNum],np;
-    USERp u = User[SpriteNum],nu;
+    USERp nu;
     short New;
 
     New = SpawnSprite(STAT_MISSILE, PUFF, s_WaterSmoke, sp->sectnum,
@@ -20706,17 +20504,15 @@ void QueueReset(void)
         LoWangsQueue[i] = -1;
 }
 
-SWBOOL TestDontStick(short SpriteNum, short hit_sect, short hit_wall, int hit_z)
+SWBOOL TestDontStick(short SpriteNum, short hit_wall)
 {
     WALLp wp;
 
     if (hit_wall < 0)
     {
         ASSERT(SpriteNum>=0);
-        SPRITEp sp = &sprite[SpriteNum];
         USERp u = User[SpriteNum];
         hit_wall = NORM_WALL(u->ret);
-        hit_sect = sp->sectnum;
     }
 
     wp = &wall[hit_wall];
@@ -20744,7 +20540,7 @@ int QueueStar(short SpriteNum)
     SPRITEp sp = &sprite[SpriteNum];
     SPRITEp osp;
 
-    if (TestDontStick(SpriteNum, -1, -1, sp->z))
+    if (TestDontStick(SpriteNum, -1))
     {
         KillSprite(SpriteNum);
         return -1;
@@ -20780,16 +20576,16 @@ int QueueStar(short SpriteNum)
     return SpriteNum;
 }
 
-int QueueHole(short ang, short hit_sect, short hit_wall, int hit_x, int hit_y, int hit_z)
+int QueueHole(short hit_sect, short hit_wall, int hit_x, int hit_y, int hit_z)
 {
-    short w,nw,wall_ang,dang;
+    short w,nw,wall_ang;
     short SpriteNum;
     int nx,ny;
     SPRITEp sp;
     short sectnum;
 
 
-    if (TestDontStick(-1,hit_sect,hit_wall,hit_z))
+    if (TestDontStick(-1,hit_wall))
         return -1;
 
     if (HoleQueue[HoleQueueHead] == -1)
@@ -20848,11 +20644,8 @@ STATE s_FloorBlood1[] =
 int QueueFloorBlood(short hit_sprite)
 {
     SPRITEp hsp = &sprite[hit_sprite];
-    short w,nw,wall_ang,dang;
     short SpriteNum;
-    int nx,ny;
     SPRITEp sp;
-    short sectnum;
     USERp u = User[hit_sprite];
     SECTORp sectp = &sector[hsp->sectnum];
 
@@ -20925,18 +20718,12 @@ STATE s_FootPrint3[] =
 int QueueFootPrint(short hit_sprite)
 {
     SPRITEp hsp = &sprite[hit_sprite];
-    short w,nw,wall_ang,dang;
     short SpriteNum;
-    int nx,ny;
     SPRITEp sp;
-    short sectnum;
     USERp u = User[hit_sprite];
     USERp nu;
     short rnd_num=0;
     SWBOOL Found=FALSE;
-    SPRITEp under_sp;
-    short i, nexti;
-    SECT_USERp sectu = SectUser[hsp->sectnum];
     SECTORp sectp = &sector[hsp->sectnum];
 
 
@@ -21092,7 +20879,7 @@ int QueueWallBlood(short hit_sprite, short ang)
 
     if (hitinfo.wall >= 0)   // Don't check if blood didn't hit a wall, otherwise the ASSERT fails!
     {
-        if (TestDontStick(-1, hitinfo.sect, hitinfo.wall, hitinfo.pos.z))
+        if (TestDontStick(-1, hitinfo.wall))
             return -1;
     }
     else
@@ -21170,7 +20957,6 @@ int
 DoFloorBlood(short SpriteNum)
 {
     SPRITEp sp = &sprite[SpriteNum];
-    USERp u = User[SpriteNum];
 
     SPRITEp psp = User[SpriteNum]->SpriteP;
     int dist, near_dist = FEET_IN_BLOOD_DIST, a,b,c;
@@ -21241,7 +21027,6 @@ int
 DoWallBlood(short SpriteNum)
 {
     SPRITEp sp = &sprite[SpriteNum];
-    USERp u = User[SpriteNum];
 
     // Make blood drip down the wall
     if (sp->yrepeat < 80)
@@ -21390,7 +21175,6 @@ DoShrapVelocity(int16_t SpriteNum)
 {
     SPRITEp sp = &sprite[SpriteNum];
     USERp u = User[SpriteNum];
-    int32_t dax, day, daz;
 
     if (TEST(u->Flags, SPR_UNDERWATER) || SpriteInUnderwaterArea(sp))
     {
@@ -21419,7 +21203,7 @@ DoShrapVelocity(int16_t SpriteNum)
             return TRUE;
         case HIT_SPRITE:
         {
-            short wall_ang, dang;
+            short wall_ang;
             short hit_sprite = -2;
             SPRITEp hsp;
 //                PlaySound(DIGI_DHCLUNK, &sp->x, &sp->y, &sp->z, v3df_dontpan);
@@ -21436,7 +21220,7 @@ DoShrapVelocity(int16_t SpriteNum)
 
         case HIT_WALL:
         {
-            short hit_wall,nw,wall_ang,dang;
+            short hit_wall,nw,wall_ang;
             WALLp wph;
 
 
@@ -21730,7 +21514,6 @@ DoItemFly(int16_t SpriteNum)
 {
     SPRITEp sp = &sprite[SpriteNum];
     USERp u = User[SpriteNum];
-    int32_t dax, day, daz;
 
     if (TEST(u->Flags, SPR_UNDERWATER))
     {
@@ -21756,7 +21539,7 @@ DoItemFly(int16_t SpriteNum)
         {
         case HIT_SPRITE:
         {
-            short wall_ang, dang;
+            short wall_ang;
             short hit_sprite = -2;
             SPRITEp hsp;
 
@@ -21780,7 +21563,7 @@ DoItemFly(int16_t SpriteNum)
 
         case HIT_WALL:
         {
-            short hit_wall,nw,wall_ang,dang;
+            short hit_wall,nw,wall_ang;
             WALLp wph;
 
             hit_wall = NORM_WALL(u->ret);
@@ -21824,7 +21607,6 @@ int QueueLoWangs(short SpriteNum)
 {
     SPRITEp sp = &sprite[SpriteNum],ps;
     USERp u;
-    SPRITEp osp;
     short NewSprite;
 
 
@@ -21852,7 +21634,6 @@ int QueueLoWangs(short SpriteNum)
     else
     {
         // move old sprite to new sprite's place
-        osp = &sprite[LoWangsQueue[LoWangsQueueHead]];
         setspritez(LoWangsQueue[LoWangsQueueHead], (vec3_t *)sp);
         NewSprite = LoWangsQueue[LoWangsQueueHead];
         ASSERT(sprite[NewSprite].statnum != MAXSTATUS);

@@ -19,6 +19,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #ifndef __bullet_h__
 #define __bullet_h__
 
+#include "aistuff.h"
+
 // 32 bytes
 struct bulletInfo
 {
@@ -31,7 +33,6 @@ struct bulletInfo
     short nFlags;
     short nRadius; // damage radius
     short xyRepeat;
-    char pad[12];
 };
 
 extern bulletInfo BulletInfo[];

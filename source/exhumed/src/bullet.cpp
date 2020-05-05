@@ -31,6 +31,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "gun.h"
 #include "names.h"
 #include "lighting.h"
+#include "object.h"
 #include <string.h>
 #include <assert.h>
 #ifndef __WATCOMC__
@@ -47,9 +48,9 @@ short BulletFree[kMaxBullets];
 // 32 bytes
 struct Bullet
 {
-    short nSeq; // 0
-    short field_2; // 2
-    short nSprite; // 4
+    short nSeq;
+    short nFrame;
+    short nSprite;
     short field_6;
     short field_8;
     short nType;
@@ -73,23 +74,23 @@ int nBulletCount = 0;
 short nRadialBullet = 0;
 
 bulletInfo BulletInfo[] = {
-    { 25,   1,    20, -1, -1, 13, 0,  0, -1, 0 },
-    { 25,  -1, 65000, -1, 31, 73, 0,  0, -1, 0 },
-    { 15,  -1, 60000, -1, 31, 73, 0,  0, -1, 0 },
-    { 5,   15,  2000, -1, 14, 38, 4,  5,  3, 0 },
-    { 250, 100, 2000, -1, 33, 34, 4, 20, -1, 0 },
-    { 200, -1,  2000, -1, 20, 23, 4, 10, -1, 0 },
-    { 200, -1, 60000, 68, 68, -1, -1, 0, -1, 0 },
-    { 300,  1,     0, -1, -1, -1, 0, 50, -1, 0 },
-    { 18,  -1,  2000, -1, 18, 29, 4,  0, -1, 0 },
-    { 20,  -1,  2000, 37, 11, 30, 4,  0, -1, 0 },
-    { 25,  -1,  3000, -1, 44, 36, 4, 15, 90, 0 },
-    { 30,  -1,  1000, -1, 52, 53, 4, 20, 48, 0 },
-    { 20,  -1,  3500, -1, 54, 55, 4, 30, -1, 0 },
-    { 10,  -1,  5000, -1, 57, 76, 4,  0, -1, 0 },
-    { 40,  -1,  1500, -1, 63, 38, 4, 10, 40, 0 },
-    { 20,  -1,  2000, -1, 60, 12, 0,  0, -1, 0 },
-    { 5,   -1, 60000, -1, 31, 76, 0,  0, -1, 0 }
+    { 25,   1,    20, -1, -1, 13, 0,  0, -1 },
+    { 25,  -1, 65000, -1, 31, 73, 0,  0, -1 },
+    { 15,  -1, 60000, -1, 31, 73, 0,  0, -1 },
+    { 5,   15,  2000, -1, 14, 38, 4,  5,  3 },
+    { 250, 100, 2000, -1, 33, 34, 4, 20, -1 },
+    { 200, -1,  2000, -1, 20, 23, 4, 10, -1 },
+    { 200, -1, 60000, 68, 68, -1, -1, 0, -1 },
+    { 300,  1,     0, -1, -1, -1, 0, 50, -1 },
+    { 18,  -1,  2000, -1, 18, 29, 4,  0, -1 },
+    { 20,  -1,  2000, 37, 11, 30, 4,  0, -1 },
+    { 25,  -1,  3000, -1, 44, 36, 4, 15, 90 },
+    { 30,  -1,  1000, -1, 52, 53, 4, 20, 48 },
+    { 20,  -1,  3500, -1, 54, 55, 4, 30, -1 },
+    { 10,  -1,  5000, -1, 57, 76, 4,  0, -1 },
+    { 40,  -1,  1500, -1, 63, 38, 4, 10, 40 },
+    { 20,  -1,  2000, -1, 60, 12, 0,  0, -1 },
+    { 5,   -1, 60000, -1, 31, 76, 0,  0, -1 }
 };
 
 
@@ -132,7 +133,7 @@ void IgniteSprite(int nSprite)
 {
     sprite[nSprite].hitag += 2;
 
-    int nAnim = BuildAnim(-1, 38, 0, sprite[nSprite].x, sprite[nSprite].y, sprite[nSprite].z, sprite[nSprite].sectnum, 40, 20);//276);
+    int nAnim = BuildAnim(-1, 38, 0, sprite[nSprite].x, sprite[nSprite].y, sprite[nSprite].z, sprite[nSprite].sectnum, 40, 20);
     short nAnimSprite = GetAnimSprite(nAnim);
 
     sprite[nAnimSprite].hitag = nSprite;
@@ -157,7 +158,7 @@ void BulletHitsSprite(Bullet *pBullet, short nBulletSprite, short nHitSprite, in
     {
         case 3:
         {
-            if (nStat > 107 || nStat == 98) {
+            if (nStat > 107 || nStat == kStatAnubisDrum) {
                 return;
             }
 
@@ -175,7 +176,7 @@ void BulletHitsSprite(Bullet *pBullet, short nBulletSprite, short nHitSprite, in
         }
         case 14:
         {
-            if (nStat > 107 || nStat == 98) {
+            if (nStat > 107 || nStat == kStatAnubisDrum) {
                 return;
             }
             // else - fall through to below cases
@@ -199,7 +200,15 @@ void BulletHitsSprite(Bullet *pBullet, short nBulletSprite, short nHitSprite, in
             spritetype *pSprite = &sprite[nSprite];
             spritetype *pHitSprite = &sprite[nHitSprite];
 
-            if (nStat != 98)
+            if (nStat == kStatAnubisDrum)
+            {
+                short nAngle = (pSprite->ang + 256) - RandomSize(9);
+
+                pHitSprite->xvel = Cos(nAngle) << 1;
+                pHitSprite->yvel = Sin(nAngle) << 1;
+                pHitSprite->zvel = (-(RandomSize(3) + 1)) << 8;
+            }
+            else
             {
                 int xVel = pHitSprite->xvel;
                 int yVel = pHitSprite->yvel;
@@ -211,14 +220,6 @@ void BulletHitsSprite(Bullet *pBullet, short nBulletSprite, short nHitSprite, in
 
                 pHitSprite->xvel = xVel;
                 pHitSprite->yvel = yVel;
-            }
-            else
-            {
-                short nAngle = pSprite->ang - (RandomSize(9) - 256);
-
-                pHitSprite->xvel = Cos(nAngle) << 1;
-                pHitSprite->yvel = Sin(nAngle) << 1;
-                pHitSprite->zvel = (-(RandomSize(3) + 1)) << 8;
             }
 
             break;
@@ -245,22 +246,21 @@ void BulletHitsSprite(Bullet *pBullet, short nBulletSprite, short nHitSprite, in
 
     switch (nStat)
     {
-    case 97:
-        break;
-    case 0:
-    case 98:
-    case 102:
-    case 141:
-    case 152:
-        BuildAnim(-1, 12, 0, x, y, z, nSector, 40, 0);
-        break;
-    default:
-        BuildAnim(-1, 39, 0, x, y, z, nSector, 40, 0);
-        if (pBullet->nType > 2)
-        {
-            BuildAnim(-1, pBulletInfo->field_C, 0, x, y, z, nSector, 40, pBulletInfo->nFlags);
-        }
-        break;
+        case kStatDestructibleSprite:
+            break;
+        case kStatAnubisDrum:
+        case 102:
+        case kStatExplodeTrigger:
+        case kStatExplodeTarget:
+            BuildAnim(-1, 12, 0, x, y, z, nSector, 40, 0);
+            break;
+        default:
+            BuildAnim(-1, 39, 0, x, y, z, nSector, 40, 0);
+            if (pBullet->nType > 2)
+            {
+                BuildAnim(-1, pBulletInfo->field_C, 0, x, y, z, nSector, 40, pBulletInfo->nFlags);
+            }
+            break;
     }
 }
 
@@ -322,7 +322,7 @@ int MoveBullet(short nBullet)
                 if (pBullet->field_E == 3)
                 {
                     pBullet->nSeq = 45;
-                    pBullet->field_2 = 0;
+                    pBullet->nFrame = 0;
                     pSprite->xrepeat = 40;
                     pSprite->yrepeat = 40;
                     pSprite->shade = 0;
@@ -336,7 +336,6 @@ int MoveBullet(short nBullet)
             }
         }
 
-        // loc_2A1DD
         nVal = movesprite(nSprite, pBullet->x, pBullet->y, pBullet->z, pSprite->clipdist >> 1, pSprite->clipdist >> 1, CLIPMASK1);
 
 MOVEEND:
@@ -434,8 +433,6 @@ HITSPRITE:
             }
             else
             {
-//				assert(hitsect <= kMaxSectors);
-
                 BulletHitsSprite(pBullet, pSprite->owner, hitsprite, x2, y2, z2, hitsect);
             }
         }
@@ -459,56 +456,60 @@ HITWALL:
             }
         }
 
-        // loc_2A4F5:?
-        if (hitsprite < 0 && hitwall < 0)
+        if (hitsect > -1) // NOTE: hitsect can be -1. this check wasn't in original code. TODO: demo compatiblity?
         {
-            if ((SectBelow[hitsect] >= 0 && (SectFlag[SectBelow[hitsect]] & kSectUnderwater)) || SectDepth[hitsect])
+            if (hitsprite < 0 && hitwall < 0)
             {
-                pSprite->x = x2;
-                pSprite->y = y2;
-                pSprite->z = z2;
-                BuildSplash(nSprite, hitsect);
+                if ((SectBelow[hitsect] >= 0 && (SectFlag[SectBelow[hitsect]] & kSectUnderwater)) || SectDepth[hitsect])
+                {
+                    pSprite->x = x2;
+                    pSprite->y = y2;
+                    pSprite->z = z2;
+                    BuildSplash(nSprite, hitsect);
+                }
+                else
+                {
+                    BuildAnim(-1, pBulletInfo->field_C, 0, x2, y2, z2, hitsect, 40, pBulletInfo->nFlags);
+                }
             }
             else
             {
-                BuildAnim(-1, pBulletInfo->field_C, 0, x2, y2, z2, hitsect, 40, pBulletInfo->nFlags);
-            }
-        }
-        else if (hitwall >= 0)
-        {
-            BackUpBullet(&x2, &y2, pSprite->ang);
+                if (hitwall >= 0)
+                {
+                    BackUpBullet(&x2, &y2, pSprite->ang);
 
-            if (nType != 3 || RandomSize(2) == 0)
-            {
-                int zOffset = RandomSize(8) << 3;
+                    if (nType != 3 || RandomSize(2) == 0)
+                    {
+                        int zOffset = RandomSize(8) << 3;
 
-                if (!RandomBit()) {
-                    zOffset = -zOffset;
+                        if (!RandomBit()) {
+                            zOffset = -zOffset;
+                        }
+
+                        // draws bullet puff on walls when they're shot
+                        BuildAnim(-1, pBulletInfo->field_C, 0, x2, y2, z2 + zOffset, hitsect, 40, pBulletInfo->nFlags);
+                    }
+                }
+                else
+                {
+                    pSprite->x = x2;
+                    pSprite->y = y2;
+                    pSprite->z = z2;
+
+                    mychangespritesect(nSprite, hitsect);
                 }
 
-                // draws bullet puff on walls when they're shot
-                BuildAnim(-1, pBulletInfo->field_C, 0, x2, y2, z2 + zOffset, hitsect, 40, pBulletInfo->nFlags);
+                if (BulletInfo[nType].nRadius)
+                {
+                    nRadialBullet = nType;
+
+                    runlist_RadialDamageEnemy(nSprite, pBulletInfo->nDamage, pBulletInfo->nRadius);
+
+                    nRadialBullet = -1;
+
+                    AddFlash(pSprite->sectnum, pSprite->x, pSprite->y, pSprite->z, 128);
+                }
             }
-        }
-        else
-        {
-            pSprite->x = x2;
-            pSprite->y = y2;
-            pSprite->z = z2;
-
-            mychangespritesect(nSprite, hitsect);
-        }
-
-        // loc_2A639:
-        if (BulletInfo[nType].nRadius)
-        {
-            nRadialBullet = nType;
-
-            runlist_RadialDamageEnemy(nSprite, pBulletInfo->nDamage, pBulletInfo->nRadius);
-
-            nRadialBullet = -1;
-
-            AddFlash(pSprite->sectnum, pSprite->x, pSprite->y, pSprite->z, 128);
         }
 
         DestroyBullet(nBullet);
@@ -632,7 +633,7 @@ int BuildBullet(short nSprite, int nType, int UNUSED(ebx), int UNUSED(ecx), int 
 
     pBullet->field_10 = 0;
     pBullet->field_E = pBulletInfo->field_2;
-    pBullet->field_2 = 0;
+    pBullet->nFrame  = 0;
 
     short nSeq;
 
@@ -783,23 +784,23 @@ void FuncBullet(int a, int UNUSED(b), int nRun)
     short nSeq = SeqOffsets[BulletList[nBullet].nSeq];
     short nSprite = BulletList[nBullet].nSprite;
 
-    int nMessage = a & 0x7F0000;
+    int nMessage = a & kMessageMask;
 
     switch (nMessage)
     {
         case 0x20000:
         {
-            short nFlag = FrameFlag[SeqBase[nSeq] + BulletList[nBullet].field_2];
+            short nFlag = FrameFlag[SeqBase[nSeq] + BulletList[nBullet].nFrame];
 
-            seq_MoveSequence(nSprite, nSeq, BulletList[nBullet].field_2);
+            seq_MoveSequence(nSprite, nSeq, BulletList[nBullet].nFrame);
 
             if (nFlag & 0x80)
             {
                 BuildAnim(-1, 45, 0, sprite[nSprite].x, sprite[nSprite].y, sprite[nSprite].z, sprite[nSprite].sectnum, sprite[nSprite].xrepeat, 0);
             }
 
-            BulletList[nBullet].field_2++;
-            if (BulletList[nBullet].field_2 >= SeqSize[nSeq])
+            BulletList[nBullet].nFrame++;
+            if (BulletList[nBullet].nFrame >= SeqSize[nSeq])
             {
                 if (!BulletList[nBullet].field_12)
                 {
@@ -807,7 +808,7 @@ void FuncBullet(int a, int UNUSED(b), int nRun)
                     BulletList[nBullet].field_12++;
                 }
 
-                BulletList[nBullet].field_2 = 0;
+                BulletList[nBullet].nFrame = 0;
             }
 
             if (BulletList[nBullet].field_E != -1 && --BulletList[nBullet].field_E == 0)
@@ -828,11 +829,11 @@ void FuncBullet(int a, int UNUSED(b), int nRun)
 
             if (BulletList[nBullet].nType == 15)
             {
-                seq_PlotArrowSequence(nSprite2, nSeq, BulletList[nBullet].field_2);
+                seq_PlotArrowSequence(nSprite2, nSeq, BulletList[nBullet].nFrame);
             }
             else
             {
-                seq_PlotSequence(nSprite2, nSeq, BulletList[nBullet].field_2, 0);
+                seq_PlotSequence(nSprite2, nSeq, BulletList[nBullet].nFrame, 0);
                 tsprite[nSprite2].owner = -1;
             }
             break;
@@ -843,7 +844,7 @@ void FuncBullet(int a, int UNUSED(b), int nRun)
 
         default:
         {
-            DebugOut("unknown msg %x for bullet\n", a & 0x7F0000);
+            DebugOut("unknown msg %d for bullet\n", nMessage);
             return;
         }
     }

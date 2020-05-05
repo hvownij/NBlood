@@ -1261,7 +1261,7 @@ void Screen_Play(void)
 
         ototalclock = totalclock + 1; // pause game like ANMs
 
-        if (!G_FPSLimit())
+        if (!engineFPSLimit())
             continue;
 
         videoClearScreen(0);
@@ -1507,7 +1507,8 @@ GAMEEXEC_STATIC void VM_Execute(native_t loop)
                 continue;
 
             case CON_IFPDISTL:
-                VM_CONDITIONAL(!(DEER && sub_535EC()) && vm.playerDist < *(++insptr));
+                insptr++;
+                VM_CONDITIONAL(!(DEER && sub_535EC()) && vm.playerDist < *(insptr));
                 if (vm.playerDist > MAXSLEEPDIST && vm.pActor->timetosleep == 0)
                     vm.pActor->timetosleep = SLEEPTIME;
                 continue;
@@ -1922,14 +1923,8 @@ GAMEEXEC_STATIC void VM_Execute(native_t loop)
                     continue;
                 }
                 insptr++;
-                if (g_gameType & GAMEFLAG_RR)
-                {
-                    // This check does not exist in Duke Nukem.
-                    if ((g_spriteExtra[vm.spriteNum] < 1 || g_spriteExtra[vm.spriteNum] == 128)
-                        && A_CheckSpriteFlags(vm.spriteNum, SFLAG_KILLCOUNT))
-                        P_AddKills(pPlayer, *insptr);
-                }
-                else P_AddKills(pPlayer, *insptr);
+                if (!RR || ((g_spriteExtra[vm.spriteNum] < 1 || g_spriteExtra[vm.spriteNum] == 128) && A_CheckSpriteFlags(vm.spriteNum, SFLAG_KILLCOUNT)))
+                    P_AddKills(pPlayer, *insptr);
                 insptr++;
                 vm.pActor->actorstayput = -1;
                 continue;

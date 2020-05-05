@@ -43,6 +43,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 void SaveGame(CGameMenuItemZEditBitmap *, CGameMenuEvent *);
 
 void SaveGameProcess(CGameMenuItemChain *);
+void ShowDifficulties();
 void SetDifficultyAndStart(CGameMenuItemChain *);
 void SetDetail(CGameMenuItemSlider *);
 void SetGamma(CGameMenuItemSlider *);
@@ -163,7 +164,7 @@ const char *pzShowWeaponStrings[] = {
     "VOXEL"
 };
 
-char zUserMapName[16];
+char zUserMapName[BMAX_PATH];
 const char *zEpisodeNames[6];
 const char *zLevelNames[6][16];
 
@@ -228,7 +229,12 @@ CGameMenuItemChain itemMainSave7("END GAME", 1, 0, 135, 320, 1, &menuRestart, -1
 CGameMenuItemChain itemMainSave8("QUIT", 1, 0, 150, 320, 1, &menuQuit, -1, NULL, 0);
 
 CGameMenuItemTitle itemEpisodesTitle("EPISODES", 1, 160, 20, 2038);
-CGameMenuItemChain7F2F0 itemEpisodes[6];
+CGameMenuItemChain7F2F0 itemEpisodes[kMaxEpisodes-1];
+
+CGameMenu menuUserMap;
+CGameMenuItemChain itemUserMap("USER MAP", 1, 0, 60, 320, 1, &menuUserMap, 0, NULL, 0);
+CGameMenuItemTitle itemUserMapTitle("USER MAP", 1, 160, 20, 2038);
+CGameMenuFileSelect itemUserMapList("", 3, 0, 0, 0, "./", "*.map", gGameOptions.szUserMap, ShowDifficulties, 0);
 
 CGameMenuItemTitle itemDifficultyTitle("DIFFICULTY", 1, 160, 20, 2038);
 CGameMenuItemChain itemDifficulty1("STILL KICKING", 1, 0, 60, 320, 1, NULL, -1, SetDifficultyAndStart, 0);
@@ -300,6 +306,11 @@ CGameMenuItemZEditBitmap itemLoadGame9(NULL, 3, 20, 140, 320, strRestoreGameStri
 CGameMenuItemZEditBitmap itemLoadGame10(NULL, 3, 20, 150, 320, strRestoreGameStrings[9], 16, 1, LoadGame, 9);
 CGameMenuItemBitmapLS itemLoadGamePic(NULL, 3, 0, 0, 2518);
 
+CGameMenu menuMultiUserMaps;
+
+CGameMenuItemTitle itemNetStartUserMapTitle("USER MAP", 1, 160, 20, 2038);
+CGameMenuFileSelect menuMultiUserMap("", 3, 0, 0, 0, "./", "*.map", zUserMapName);
+
 CGameMenuItemTitle itemNetStartTitle("MULTIPLAYER", 1, 160, 20, 2038);
 CGameMenuItemZCycle itemNetStart1("GAME:", 3, 66, 60, 180, 0, 0, zNetGameTypes, 3, 0);
 CGameMenuItemZCycle itemNetStart2("EPISODE:", 3, 66, 70, 180, 0, SetupNetLevels, NULL, 0, 0);
@@ -311,7 +322,7 @@ CGameMenuItemZCycle itemNetStart7("ITEMS:", 3, 66, 120, 180, 0, 0, zItemStrings,
 CGameMenuItemZBool itemNetStart8("FRIENDLY FIRE:", 3, 66, 130, 180, true, 0, NULL, NULL);
 CGameMenuItemZBool itemNetStart9("KEEP KEYS ON RESPAWN:", 3, 66, 140, 180, false, 0, NULL, NULL);
 CGameMenuItemZBool itemNetStart10("V1.0x WEAPONS BALANCE:", 3, 66, 150, 180, false, 0, NULL, NULL);
-CGameMenuItemZEdit itemNetStart11("USER MAP:", 3, 66, 160, 180, zUserMapName, 13, 0, NULL, 0);
+CGameMenuItemChain itemNetStart11("USER MAP", 3, 66, 160, 180, 0, &menuMultiUserMaps, 0, NULL, 0);
 CGameMenuItemChain itemNetStart12("START GAME", 1, 66, 175, 280, 0, 0, -1, StartNetGame, 0);
 
 CGameMenuItemText itemLoadingText("LOADING...", 1, 160, 100, 1);
@@ -605,6 +616,7 @@ int nMusicDeviceValues[] = {
 #ifdef _WIN32
     ASS_WinMM,
 #endif
+    ASS_SF2,
 };
 
 const char *pzMusicDeviceStrings[] = {
@@ -612,7 +624,14 @@ const char *pzMusicDeviceStrings[] = {
 #ifdef _WIN32
     "SYSTEM MIDI",
 #endif
+    ".SF2 SYNTH",
 };
+static char sf2bankfile[BMAX_PATH];
+
+CGameMenu menuOptionsSoundSF2;
+
+CGameMenuItemTitle itemOptionsSoundSF2Title("SELECT SF2 BANK", 1, 160, 20, 2038);
+CGameMenuFileSelect itemOptionsSoundSF2FS("", 3, 0, 0, 0, "./", "*.sf2", sf2bankfile);
 
 CGameMenuItemTitle itemOptionsSoundTitle("SOUND SETUP", 1, 160, 20, 2038);
 CGameMenuItemZBool itemOptionsSoundSoundToggle("SOUND:", 3, 66, 60, 180, false, UpdateSoundToggle, NULL, NULL);
@@ -623,8 +642,9 @@ CGameMenuItemSlider itemOptionsSoundMusicVolume("MUSIC VOLUME:", 3, 66, 100, 180
 CGameMenuItemZCycle itemOptionsSoundSampleRate("SAMPLE RATE:", 3, 66, 110, 180, 0, UpdateSoundRate, pzSoundRateStrings, 3, 0);
 CGameMenuItemSlider itemOptionsSoundNumVoices("VOICES:", 3, 66, 120, 180, NumVoices, 16, 256, 16, UpdateNumVoices, -1, -1, kMenuSliderValue);
 CGameMenuItemZBool itemOptionsSoundCDToggle("REDBOOK AUDIO:", 3, 66, 130, 180, false, UpdateCDToggle, NULL, NULL);
-CGameMenuItemZCycle itemOptionsSoundMusicDevice("MUSIC DEVICE:", 3, 66, 140, 180, 0, UpdateMusicDevice, pzMusicDeviceStrings, ARRAY_SIZE(pzMusicDeviceStrings), 0);
-CGameMenuItemChain itemOptionsSoundApplyChanges("APPLY CHANGES", 3, 66, 150, 180, 0, NULL, 0, SetSound, 0);
+CGameMenuItemZCycle itemOptionsSoundMusicDevice("MIDI DRIVER:", 3, 66, 140, 180, 0, UpdateMusicDevice, pzMusicDeviceStrings, ARRAY_SIZE(pzMusicDeviceStrings), 0);
+CGameMenuItemChain itemOptionsSoundSF2Bank("SF2 BANK", 3, 66, 150, 180, 0, &menuOptionsSoundSF2, 0, NULL, 0);
+CGameMenuItemChain itemOptionsSoundApplyChanges("APPLY CHANGES", 3, 66, 160, 180, 0, NULL, 0, SetSound, 0);
 
 
 void UpdatePlayerName(CGameMenuItemZEdit *pItem, CGameMenuEvent *pEvent);
@@ -651,7 +671,6 @@ void SetMouseAimMode(CGameMenuItemZBool *pItem);
 void SetMouseVerticalAim(CGameMenuItemZBool *pItem);
 void SetMouseXScale(CGameMenuItemSlider *pItem);
 void SetMouseYScale(CGameMenuItemSlider *pItem);
-void SetMouseDigitalAxis(CGameMenuItemZCycle *pItem);
 
 void PreDrawControlMouse(CGameMenuItem *pItem);
 
@@ -663,12 +682,8 @@ CGameMenuItemSliderFloat itemOptionsControlMouseSensitivity("SENSITIVITY:", 3, 6
 CGameMenuItemZBool itemOptionsControlMouseAimFlipped("INVERT AIMING:", 3, 66, 80, 180, false, SetMouseAimFlipped, NULL, NULL);
 CGameMenuItemZBool itemOptionsControlMouseAimMode("AIMING TYPE:", 3, 66, 90, 180, false, SetMouseAimMode, "HOLD", "TOGGLE");
 CGameMenuItemZBool itemOptionsControlMouseVerticalAim("VERTICAL AIMING:", 3, 66, 100, 180, false, SetMouseVerticalAim, NULL, NULL);
-CGameMenuItemSlider itemOptionsControlMouseXScale("X-SCALE:", 3, 66, 110, 180, (int*)&MouseAnalogueScale[0], 0, 65536, 1024, SetMouseXScale, -1, -1, kMenuSliderQ16);
-CGameMenuItemSlider itemOptionsControlMouseYScale("Y-SCALE:", 3, 66, 120, 180, (int*)&MouseAnalogueScale[1], 0, 65536, 1024, SetMouseYScale, -1, -1, kMenuSliderQ16);
-CGameMenuItemZCycle itemOptionsControlMouseDigitalUp("DIGITAL UP", 3, 66, 130, 180, 0, SetMouseDigitalAxis, NULL, 0, 0, true);
-CGameMenuItemZCycle itemOptionsControlMouseDigitalDown("DIGITAL DOWN", 3, 66, 140, 180, 0, SetMouseDigitalAxis, NULL, 0, 0, true);
-CGameMenuItemZCycle itemOptionsControlMouseDigitalLeft("DIGITAL LEFT", 3, 66, 150, 180, 0, SetMouseDigitalAxis, NULL, 0, 0, true);
-CGameMenuItemZCycle itemOptionsControlMouseDigitalRight("DIGITAL RIGHT", 3, 66, 160, 180, 0, SetMouseDigitalAxis, NULL, 0, 0, true);
+CGameMenuItemSlider itemOptionsControlMouseXScale("X-SCALE:", 3, 66, 110, 180, 0, 0, 65536, 1024, SetMouseXScale, -1, -1, kMenuSliderQ16);
+CGameMenuItemSlider itemOptionsControlMouseYScale("Y-SCALE:", 3, 66, 120, 180, 0, 0, 65536, 1024, SetMouseYScale, -1, -1, kMenuSliderQ16);
 
 void SetupNetworkMenu(void);
 void SetupNetworkHostMenu(CGameMenuItemChain *pItem);
@@ -826,7 +841,7 @@ void SetupEpisodeMenu(void)
     int height;
     gMenuTextMgr.GetFontInfo(1, NULL, NULL, &height);
     int j = 0;
-    for (int i = 0; i < 6; i++)
+    for (int i = 0; i < kMaxEpisodes-1; i++)
     {
         EPISODEINFO *pEpisode = &gEpisodeInfo[i];
         if (!pEpisode->bloodbath || gGameOptions.nGameType != 0)
@@ -863,7 +878,13 @@ void SetupEpisodeMenu(void)
             j++;
         }
     }
+
+    itemUserMap.m_nY = 55+(height+8)*(gEpisodeCount-1);
+    menuEpisode.Add(&itemUserMap, false);
     menuEpisode.Add(&itemBloodQAV, false);
+
+    menuUserMap.Add(&itemUserMapTitle, true);
+    menuUserMap.Add(&itemUserMapList, true);
 }
 
 void SetupMainMenu(void)
@@ -935,6 +956,8 @@ void SetupNetStartMenu(void)
     menuNetStart.Add(&itemNetStart10, false);
     menuNetStart.Add(&itemNetStart11, false);
     menuNetStart.Add(&itemNetStart12, false);
+    menuMultiUserMaps.Add(&itemNetStartUserMapTitle, true);
+    menuMultiUserMaps.Add(&menuMultiUserMap, true);
     itemNetStart1.SetTextIndex(1);
     itemNetStart4.SetTextIndex(2);
     itemNetStart5.SetTextIndex(0);
@@ -1278,8 +1301,13 @@ void SetupOptionsMenu(void)
     menuOptionsSound.Add(&itemOptionsSoundNumVoices, false);
     menuOptionsSound.Add(&itemOptionsSoundCDToggle, false);
     menuOptionsSound.Add(&itemOptionsSoundMusicDevice, false);
+    menuOptionsSound.Add(&itemOptionsSoundSF2Bank, false);
+
     menuOptionsSound.Add(&itemOptionsSoundApplyChanges, false);
     menuOptionsSound.Add(&itemBloodQAV, false);
+
+    menuOptionsSoundSF2.Add(&itemOptionsSoundSF2Title, true);
+    menuOptionsSoundSF2.Add(&itemOptionsSoundSF2FS, true);
 
     menuOptionsPlayer.Add(&itemOptionsPlayerTitle, false);
     menuOptionsPlayer.Add(&itemOptionsPlayerName, true);
@@ -1304,16 +1332,7 @@ void SetupOptionsMenu(void)
     menuOptionsControlMouse.Add(&itemOptionsControlMouseVerticalAim, false);
     menuOptionsControlMouse.Add(&itemOptionsControlMouseXScale, false);
     menuOptionsControlMouse.Add(&itemOptionsControlMouseYScale, false);
-    menuOptionsControlMouse.Add(&itemOptionsControlMouseDigitalUp, false);
-    menuOptionsControlMouse.Add(&itemOptionsControlMouseDigitalDown, false);
-    menuOptionsControlMouse.Add(&itemOptionsControlMouseDigitalLeft, false);
-    menuOptionsControlMouse.Add(&itemOptionsControlMouseDigitalRight, false);
     menuOptionsControlMouse.Add(&itemBloodQAV, false);
-
-    itemOptionsControlMouseDigitalUp.SetTextArray(pzGamefuncsStrings, NUMGAMEFUNCTIONS+1, 0);
-    itemOptionsControlMouseDigitalDown.SetTextArray(pzGamefuncsStrings, NUMGAMEFUNCTIONS+1, 0);
-    itemOptionsControlMouseDigitalLeft.SetTextArray(pzGamefuncsStrings, NUMGAMEFUNCTIONS+1, 0);
-    itemOptionsControlMouseDigitalRight.SetTextArray(pzGamefuncsStrings, NUMGAMEFUNCTIONS+1, 0);
 
     itemOptionsControlMouseVerticalAim.pPreDrawCallback = PreDrawControlMouse;
 
@@ -1559,6 +1578,11 @@ void SetWeaponSwitch(CGameMenuItemZCycle *pItem)
 
 extern bool gStartNewGame;
 
+void ShowDifficulties()
+{
+    gGameMenuMgr.Push(&menuDifficulty, 3);
+}
+
 void SetDifficultyAndStart(CGameMenuItemChain *pItem)
 {
     gGameOptions.nDifficulty = pItem->at30;
@@ -1568,6 +1592,13 @@ void SetDifficultyAndStart(CGameMenuItemChain *pItem)
         gDemo.StopPlayback();
     gStartNewGame = true;
     gCheatMgr.sub_5BCF4();
+    if (Bstrlen(gGameOptions.szUserMap))
+    {
+        levelAddUserMap(gGameOptions.szUserMap);
+        levelSetupOptions(gGameOptions.nEpisode, gGameOptions.nLevel);
+        StartLevel(&gGameOptions);
+        viewResizeView(gViewSize);
+    }
     gGameMenuMgr.Deactivate();
 }
 
@@ -1896,7 +1927,15 @@ void UpdateNumVoices(CGameMenuItemSlider *pItem)
 
 void UpdateMusicDevice(CGameMenuItemZCycle *pItem)
 {
-    UNREFERENCED_PARAMETER(pItem);
+    itemOptionsSoundSF2Bank.bEnable = 0;
+    itemOptionsSoundSF2Bank.bNoDraw = 1;
+    switch (nMusicDeviceValues[itemOptionsSoundMusicDevice.m_nFocus])
+    {
+    case ASS_SF2:
+        itemOptionsSoundSF2Bank.bEnable = 1;
+        itemOptionsSoundSF2Bank.bNoDraw = 0;
+        break;
+    }
 }
 
 void SetSound(CGameMenuItemChain *pItem)
@@ -1905,6 +1944,7 @@ void SetSound(CGameMenuItemChain *pItem)
     MixRate = nSoundRateValues[itemOptionsSoundSampleRate.m_nFocus];
     NumVoices = itemOptionsSoundNumVoices.nValue;
     MusicDevice = nMusicDeviceValues[itemOptionsSoundMusicDevice.m_nFocus];
+    Bstrcpy(SF2_BankFile, sf2bankfile);
     sfxTerm();
     sndTerm();
 
@@ -1946,6 +1986,8 @@ void SetupOptionsSound(CGameMenuItemChain *pItem)
             break;
         }
     }
+
+    UpdateMusicDevice(NULL);
 }
 
 void UpdatePlayerName(CGameMenuItemZEdit *pItem, CGameMenuEvent *pEvent)
@@ -1967,62 +2009,17 @@ void SetMouseVerticalAim(CGameMenuItemZBool *pItem)
 
 void SetMouseXScale(CGameMenuItemSlider *pItem)
 {
-    MouseAnalogueScale[0] = pItem->nValue;
     CONTROL_SetAnalogAxisScale(0, pItem->nValue, controldevice_mouse);
 }
 
 void SetMouseYScale(CGameMenuItemSlider *pItem)
 {
-    MouseAnalogueScale[1] = pItem->nValue;
     CONTROL_SetAnalogAxisScale(1, pItem->nValue, controldevice_mouse);
-}
-
-void SetMouseDigitalAxis(CGameMenuItemZCycle *pItem)
-{
-    if (pItem == &itemOptionsControlMouseDigitalUp)
-    {
-        MouseDigitalFunctions[1][0] = nGamefuncsValues[pItem->m_nFocus];
-        CONTROL_MapDigitalAxis(1, MouseDigitalFunctions[1][0], 0, controldevice_mouse);
-    }
-    else if (pItem == &itemOptionsControlMouseDigitalDown)
-    {
-        MouseDigitalFunctions[1][1] = nGamefuncsValues[pItem->m_nFocus];
-        CONTROL_MapDigitalAxis(1, MouseDigitalFunctions[1][1], 1, controldevice_mouse);
-    }
-    else if (pItem == &itemOptionsControlMouseDigitalLeft)
-    {
-        MouseDigitalFunctions[0][0] = nGamefuncsValues[pItem->m_nFocus];
-        CONTROL_MapDigitalAxis(0, MouseDigitalFunctions[0][0], 0, controldevice_mouse);
-    }
-    else if (pItem == &itemOptionsControlMouseDigitalRight)
-    {
-        MouseDigitalFunctions[0][1] = nGamefuncsValues[pItem->m_nFocus];
-        CONTROL_MapDigitalAxis(0, MouseDigitalFunctions[0][1], 1, controldevice_mouse);
-    }
 }
 
 void SetupMouseMenu(CGameMenuItemChain *pItem)
 {
     UNREFERENCED_PARAMETER(pItem);
-    static CGameMenuItemZCycle *pMouseDigitalAxis[4] = {
-        &itemOptionsControlMouseDigitalLeft,
-        &itemOptionsControlMouseDigitalRight,
-        &itemOptionsControlMouseDigitalUp,
-        &itemOptionsControlMouseDigitalDown
-    };
-    for (int i = 0; i < ARRAY_SSIZE(pMouseDigitalAxis); i++)
-    {
-        CGameMenuItemZCycle *pItem = pMouseDigitalAxis[i];
-        pItem->m_nFocus = 0;
-        for (int j = 0; j < NUMGAMEFUNCTIONS+1; j++)
-        {
-            if (nGamefuncsValues[j] == MouseDigitalFunctions[i>>1][i&1])
-            {
-                pItem->m_nFocus = j;
-                break;
-            }
-        }
-    }
     itemOptionsControlMouseAimFlipped.at20 = gMouseAimingFlipped;
     itemOptionsControlMouseAimMode.at20 = gMouseAiming;
     itemOptionsControlMouseVerticalAim.at20 = gMouseAim;
@@ -2257,9 +2254,7 @@ void StartNetGame(CGameMenuItemChain *pItem)
     gPacketStartGame.weaponsV10x = itemNetStart10.at20;
     ////
     gPacketStartGame.unk = 0;
-    gPacketStartGame.userMapName[0] = 0;
-    strncpy(gPacketStartGame.userMapName, itemNetStart11.at20, 13);
-    gPacketStartGame.userMapName[12] = 0;
+    Bstrncpy(gPacketStartGame.userMapName, zUserMapName, Bstrlen(zUserMapName));
     gPacketStartGame.userMap = gPacketStartGame.userMapName[0] != 0;
 
     netBroadcastNewGame();

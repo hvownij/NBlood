@@ -54,8 +54,6 @@ short mirrorcnt; //, floormirrorcnt;
 //short floormirrorsector[MAXMIRRORS];
 SWBOOL mirrorinview;
 
-static char tempbuf[/*max(576, */ MAXXDIM /*)*/];
-
 SWBOOL MirrorMoveSkip16 = 0;
 
 // Voxel stuff
@@ -173,16 +171,15 @@ void
 JS_SpriteSetup(void)
 {
     SPRITEp sp;
-    short SpriteNum = 0, NextSprite, ndx;
+    short SpriteNum = 0, NextSprite;
     USERp u;
-    short i, num;
+    short i;
     int handle;
 
 
     TRAVERSE_SPRITE_STAT(headspritestat[0], SpriteNum, NextSprite)
     {
         short tag;
-        short bit;
 
         sp = &sprite[SpriteNum];
         tag = sp->hitag;
@@ -272,7 +269,6 @@ JS_SpriteSetup(void)
     for (i = 0; i < numwalls; i++)
     {
         short picnum;
-        short sndnum;
 
 
         picnum = wall[i].picnum;
@@ -296,6 +292,7 @@ JS_SpriteSetup(void)
         }
 
 #if 0
+        short sndnum;
         if ((sndnum = CheckTileSound(picnum)) != -1)
         {
             SpawnWallSound(sndnum, i);
@@ -316,11 +313,9 @@ JS_SpriteSetup(void)
 void
 JS_InitMirrors(void)
 {
-    short startwall, endwall, dasector;
-    int i, j, k, s, dax, day, daz, dax2, day2;
+    short startwall, endwall;
+    int i, j, s;
     short SpriteNum = 0, NextSprite;
-    SPRITEp sp;
-    static short on_cam = 0;
     SWBOOL Found_Cam = FALSE;
 
 
@@ -365,7 +360,6 @@ JS_InitMirrors(void)
                 {
                     short ii, nextii;
                     SPRITEp sp;
-                    USERp u;
 
                     mirror[mirrorcnt].ismagic = TRUE;
                     Found_Cam = FALSE;
@@ -485,7 +479,7 @@ JS_InitMirrors(void)
 /////////////////////////////////////////////////////
 #if 1
 void drawroomstotile(int daposx, int daposy, int daposz,
-                     short daang, int dahoriz, short dacursectnum, short tilenume)
+                     fix16_t daq16ang, fix16_t daq16horiz, short dacursectnum, short tilenume)
 {
     if (waloff[tilenume] == 0)
         tileLoad(tilenume);
@@ -494,7 +488,7 @@ void drawroomstotile(int daposx, int daposy, int daposz,
 
     renderSetTarget(tilenume, tilesiz[tilenume].x, tilesiz[tilenume].y);
 
-    drawrooms(daposx, daposy, daposz, daang, dahoriz, dacursectnum);
+    renderDrawRoomsQ16(daposx, daposy, daposz, daq16ang, daq16horiz, dacursectnum);
     analyzesprites(daposx, daposy, daposz, FALSE);
     renderDrawMasks();
 
@@ -507,7 +501,7 @@ void drawroomstotile(int daposx, int daposy, int daposz,
 #else
 void
 drawroomstotile(int daposx, int daposy, int daposz,
-                short daang, int dahoriz, short dacursectnum, short tilenume)
+                fix16_t daq16ang, fix16_t daq16horiz, short dacursectnum, short tilenume)
 {
 
     int i, j, k, bakchainnumpages, bakvidoption;
@@ -540,7 +534,7 @@ drawroomstotile(int daposx, int daposy, int daposz,
     }
 
     // DRAWS TO TILE HERE
-    drawrooms(daposx, daposy, daposz, daang, dahoriz, dacursectnum + MAXSECTORS);
+    renderDrawRoomsQ16(daposx, daposy, daposz, daq16ang, daq16horiz, dacursectnum + MAXSETORS);
     analyzesprites(daposx, daposy, daposz, FALSE);
     renderDrawMasks();
 
@@ -640,16 +634,13 @@ int camloopcnt = 0;                    // Timer to cycle through player
 short camplayerview = 1;                // Don't show yourself!
 
 void
-JS_DrawMirrors(PLAYERp pp, int tx, int ty, int tz, short tpang, int tphoriz)
+JS_DrawMirrors(PLAYERp pp, int tx, int ty, int tz, fix16_t tpq16ang, fix16_t tpq16horiz)
 {
-    int j, dx, dy, top, bot, cnt;
-    int x1, y1, x2, y2, ox1, oy1, ox2, oy2, dist, maxdist;
-    int tposx, tposy, thoriz;
-    int tcx, tcy, tcz;                 // Camera
-    int tiltlock, *longptr;
+    int j, cnt;
+    int dist;
+    int tposx, tposy; // Camera
+    int *longptr;
     fix16_t tang;
-    char ch, *ptr, *ptr2, *ptr3, *ptr4;
-    char tvisibility, palok;
 
 //    long tx, ty, tz, tpang;             // Interpolate so mirror doesn't
     // drift!
@@ -692,7 +683,7 @@ JS_DrawMirrors(PLAYERp pp, int tx, int ty, int tz, short tpang, int tphoriz)
 //                tx = pp->oposx + mulscale16(pp->posx - pp->oposx, smoothratio);
 //                ty = pp->oposy + mulscale16(pp->posy - pp->oposy, smoothratio);
 //                tz = pp->oposz + mulscale16(pp->posz - pp->oposz, smoothratio);
-//                tpang = pp->oang + mulscale16(((pp->pang + 1024 - pp->oang) & 2047) - 1024, smoothratio);
+//                tpq16ang = pp->oq16ang + mulscale16(((pp->q16ang + fix16_from_int(1024) - pp->oq16ang) & 0x7FFFFFF) - fix16_from_int(1024), smoothratio);
 
 
                 dist = 0x7fffffff;
@@ -726,7 +717,7 @@ JS_DrawMirrors(PLAYERp pp, int tx, int ty, int tz, short tpang, int tphoriz)
                 {
                     SPRITEp sp=NULL;
                     int camhoriz;
-                    short wall_ang, w, nw, da, tda;
+                    short w;
                     int dx, dy, dz, tdx, tdy, tdz, midx, midy;
 
 
@@ -736,6 +727,7 @@ JS_DrawMirrors(PLAYERp pp, int tx, int ty, int tz, short tpang, int tphoriz)
 
                     ASSERT(sp);
 
+                    // char tvisibility;
                     // tvisibility = g_visibility;
 //                  g_visibility <<= 1;       // Make mirror darker
 
@@ -745,7 +737,6 @@ JS_DrawMirrors(PLAYERp pp, int tx, int ty, int tz, short tpang, int tphoriz)
 
                     // Calculate the angle of the mirror wall
                     w = mirror[cnt].mirrorwall;
-                    nw = wall[w].point2;
 
                     // Get wall midpoint for offset in mirror view
                     midx = (wall[w].x + wall[wall[w].point2].x) / 2;
@@ -789,7 +780,7 @@ JS_DrawMirrors(PLAYERp pp, int tx, int ty, int tz, short tpang, int tphoriz)
 
                         if (mirror[cnt].campic != -1)
                             tilesiz[mirror[cnt].campic].x = tilesiz[mirror[cnt].campic].y = 0;
-                        drawrooms(dx, dy, dz, tpang, tphoriz, sp->sectnum + MAXSECTORS);
+                        renderDrawRoomsQ16(dx, dy, dz, tpq16ang, tpq16horiz, sp->sectnum + MAXSECTORS);
                         analyzesprites(dx, dy, dz, FALSE);
                         renderDrawMasks();
                     }
@@ -870,11 +861,11 @@ JS_DrawMirrors(PLAYERp pp, int tx, int ty, int tz, short tpang, int tphoriz)
 
                                 if (TEST_BOOL11(sp) && numplayers > 1)
                                 {
-                                    drawroomstotile(cp->posx, cp->posy, cp->posz, cp->pang, cp->horiz, cp->cursectnum, mirror[cnt].campic);
+                                    drawroomstotile(cp->posx, cp->posy, cp->posz, cp->q16ang, cp->q16horiz, cp->cursectnum, mirror[cnt].campic);
                                 }
                                 else
                                 {
-                                    drawroomstotile(sp->x, sp->y, sp->z, SP_TAG5(sp), camhoriz, sp->sectnum, mirror[cnt].campic);
+                                    drawroomstotile(sp->x, sp->y, sp->z, fix16_from_int(SP_TAG5(sp)), fix16_from_int(camhoriz), sp->sectnum, mirror[cnt].campic);
                                 }
                             }
                         }
@@ -889,10 +880,10 @@ JS_DrawMirrors(PLAYERp pp, int tx, int ty, int tz, short tpang, int tphoriz)
                     // Must call preparemirror before drawrooms and
                     // completemirror after drawrooms
 
-                    renderPrepareMirror(tx, ty, tz, fix16_from_int(tpang), fix16_from_int(tphoriz),
+                    renderPrepareMirror(tx, ty, tz, tpq16ang, tpq16horiz,
                                   mirror[cnt].mirrorwall, /*mirror[cnt].mirrorsector,*/ &tposx, &tposy, &tang);
 
-                    drawrooms(tposx, tposy, tz, fix16_to_int(tang), tphoriz, mirror[cnt].mirrorsector + MAXSECTORS);
+                    renderDrawRoomsQ16(tposx, tposy, tz, (tang), tpq16horiz, mirror[cnt].mirrorsector + MAXSECTORS);
 
                     analyzesprites(tposx, tposy, tz, TRUE);
                     renderDrawMasks();
@@ -905,7 +896,7 @@ JS_DrawMirrors(PLAYERp pp, int tx, int ty, int tz, short tpang, int tphoriz)
                 // g_visibility = tvisibility;
                 // g_visibility = NormalVisibility;
 
-                // drawrooms(tx, ty, tz, tpang, tphoriz, pp->cursectnum);
+                // renderDrawRoomsQ16(tx, ty, tz, tpq16ang, tpq16horiz, pp->cursectnum);
                 // Clean up anything that the camera view might have done
                 SetFragBar(pp);
                 tilesiz[MIRROR].x = tilesiz[MIRROR].y = 0;
@@ -919,8 +910,6 @@ JS_DrawMirrors(PLAYERp pp, int tx, int ty, int tz, short tpang, int tphoriz)
 void
 DoAutoSize(tspriteptr_t tspr)
 {
-    short i;
-
     if (!bAutoSize)
         return;
 
@@ -1071,8 +1060,6 @@ short rotang = 0;
 void
 JAnalyzeSprites(tspriteptr_t tspr)
 {
-    int i, currsprite;
-
     rotang += 4;
     if (rotang > 2047)
         rotang = 0;
@@ -1133,8 +1120,6 @@ OrgTileList orgsectorfloorlist;         // The list containing orginal sector
 void
 InsertOrgTile(OrgTileP tp, OrgTileListP thelist)
 {
-    OrgTileP cur, nxt;
-
     ASSERT(tp);
     ASSERT(ValidPtr(tp));
 
@@ -1154,7 +1139,6 @@ InsertOrgTile(OrgTileP tp, OrgTileListP thelist)
 OrgTileP
 InitOrgTile(OrgTileListP thelist)
 {
-    int i;
     OrgTileP tp;
 
 
@@ -1258,8 +1242,7 @@ JS_PlockError(short wall_num, short t)
 void
 JS_InitLockouts(void)
 {
-    SPRITEp sp;
-    short i, num;
+    short i;
     OrgTileP tp;
 
     INITLIST(&orgwalllist);             // The list containing orginal wall
@@ -1337,8 +1320,7 @@ JS_InitLockouts(void)
 void
 JS_ToggleLockouts(void)
 {
-    SPRITEp sp;
-    short i, num;
+    short i;
     OrgTileP tp;
 
 

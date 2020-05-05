@@ -509,7 +509,6 @@ typedef FILE BFILE;
 
 #define Bassert assert
 #define Brand rand
-#define Balloca alloca
 #define Bmalloc malloc
 #define Bcalloc calloc
 #define Brealloc realloc
@@ -608,12 +607,28 @@ typedef FILE BFILE;
 # define Bstrncasecmp strncasecmp
 #endif
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 # define Bsnprintf _snprintf
 # define Bvsnprintf _vsnprintf
 #else
 # define Bsnprintf snprintf
 # define Bvsnprintf vsnprintf
+#endif
+
+#ifdef _MSC_VER
+# define Balloca _alloca
+#elif defined __GNUC__
+# define Balloca __builtin_alloca
+#else
+# define Balloca alloca
+#endif
+
+#ifdef _MSC_VER
+# define Bmalloca _malloca
+# define Bfreea _freea
+#else
+# define Bmalloca alloca
+# define Bfreea(ptr) do { } while (0)
 #endif
 
 #define Btime() time(NULL)

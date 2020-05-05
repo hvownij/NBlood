@@ -1060,6 +1060,9 @@ void G_DisplayRest(int32_t smoothratio)
                 G_MoveClouds();
         }
 
+        if (DEER)
+            sub_57B38(pp->opos.x, pp->opos.y, 20, 1536);
+
         if (ud.overhead_on > 0)
         {
             // smoothratio = min(max(smoothratio,0),65536);
@@ -1533,7 +1536,7 @@ void G_DisplayLogo(void)
 
                 while (totalclock < (120 * 3) && !I_CheckAllInput())
                 {
-                    if (G_FPSLimit())
+                    if (engineFPSLimit())
                     {
                         videoClearScreen(0);
                         rotatesprite_fs(160 << 16, 100 << 16, 65536L, 0, 7106, 0, 0, 2 + 8 + 64 + BGSTRETCH);
@@ -1578,7 +1581,7 @@ void G_DisplayLogo(void)
 
                 while (totalclock < (120 * 3) && !I_CheckAllInput())
                 {
-                    if (G_FPSLimit())
+                    if (engineFPSLimit())
                     {
                         videoClearScreen(0);
                         rotatesprite_fs(160 << 16, 100 << 16, 65536L, 0, 7107, 0, 0, 2 + 8 + 64 + BGSTRETCH);
@@ -1608,6 +1611,8 @@ void G_DisplayLogo(void)
 
         //G_FadePalette(0,0,0,0);
         videoClearScreen(0L);
+
+        g_noLogo = 1; // Play intro only once
         return;
     }
     if (RRRA)
@@ -1717,7 +1722,7 @@ void G_DisplayLogo(void)
 
                 while (totalclock < (120 * 7) && !I_CheckAllInput())
                 {
-                    if (G_FPSLimit())
+                    if (engineFPSLimit())
                     {
                         videoClearScreen(0);
                         rotatesprite_fs(160 << 16, 100 << 16, 65536L, 0, DREALMS, 0, 0, 2 + 8 + 64 + BGSTRETCH);
@@ -1760,7 +1765,7 @@ void G_DisplayLogo(void)
 #endif
             !I_CheckAllInput())
         {
-            if (G_FPSLimit())
+            if (engineFPSLimit())
             {
                 videoClearScreen(0);
                 rotatesprite_fs(160<<16, 100<<16, 65536L, 0, BETASCREEN, 0, 0, 2+8+64+BGSTRETCH);
@@ -1958,7 +1963,7 @@ static void G_BonusCutscenes(void)
 
             while (1)
             {
-                if (G_FPSLimit())
+                if (engineFPSLimit())
                 {
                     videoClearScreen(0L);
                     rotatesprite_fs(0, 50<<16, 65536L, 0, VICTORY1, 0, 0, 2+8+16+64+128+BGSTRETCH);
@@ -2405,7 +2410,7 @@ void G_BonusScreen(int32_t bonusonly)
             G_HandleAsync();
             MUSIC_Update();
 
-            if (G_FPSLimit())
+            if (engineFPSLimit())
             {
                 videoClearScreen(0);
                 G_DisplayMPResultsScreen();
@@ -2470,7 +2475,7 @@ void G_BonusScreen(int32_t bonusonly)
         G_HandleAsync();
         MUSIC_Update();
 
-        if (G_FPSLimit())
+        if (engineFPSLimit())
         {
             if (g_player[myconnectindex].ps->gm&MODE_EOL)
             {
@@ -2999,7 +3004,7 @@ void G_BonusScreenRRRA(int32_t bonusonly)
             G_HandleAsync();
             MUSIC_Update();
 
-            if (G_FPSLimit())
+            if (engineFPSLimit())
             {
                 videoClearScreen(0);
                 G_DisplayMPResultsScreen();
@@ -3050,7 +3055,7 @@ void G_BonusScreenRRRA(int32_t bonusonly)
         G_HandleAsync();
         MUSIC_Update();
 
-        if (G_FPSLimit())
+        if (engineFPSLimit())
         {
             if (g_player[myconnectindex].ps->gm&MODE_EOL)
             {

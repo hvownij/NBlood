@@ -69,6 +69,7 @@ extern char CommPlayerName[32];
 
 gNET gNet;
 extern short PlayerQuitMenuLevel;
+extern SWBOOL QuitFlag;
 
 #define TIMERUPDATESIZ 32
 
@@ -99,8 +100,10 @@ typedef struct
 {
     int32_t vel;
     int32_t svel;
-    int32_t angvel;
-    int32_t aimvel;
+    fix16_t q16angvel;
+    fix16_t q16aimvel;
+    fix16_t q16ang;
+    fix16_t q16horiz;
     int32_t bits;
 } SW_AVERAGE_PACKET;
 
@@ -300,6 +303,7 @@ int EncodeBits(SW_PACKET *pak, SW_PACKET *old_pak, uint8_t* buf)
     *buf = 0;
     buf++;
 
+    // TODO: Properly copy the values in a cross-platform manner
     if (pak->vel != old_pak->vel)
     {
         *((short *)buf) = pak->vel;
@@ -314,17 +318,21 @@ int EncodeBits(SW_PACKET *pak, SW_PACKET *old_pak, uint8_t* buf)
         SET(*base_ptr, BIT(1));
     }
 
-    if (pak->angvel != old_pak->angvel)
+    if ((pak->q16angvel != old_pak->q16angvel) || (pak->q16ang != old_pak->q16ang))
     {
-        *((char *)buf) = pak->angvel;
-        buf += sizeof(pak->angvel);
+        *((fix16_t *)buf) = pak->q16angvel;
+        buf += sizeof(pak->q16angvel);
+        *((fix16_t *)buf) = pak->q16ang;
+        buf += sizeof(pak->q16ang);
         SET(*base_ptr, BIT(2));
     }
 
-    if (pak->aimvel != old_pak->aimvel)
+    if ((pak->q16aimvel != old_pak->q16aimvel) || (pak->q16horiz != old_pak->q16horiz))
     {
-        *((char *)buf) = pak->aimvel;
-        buf += sizeof(pak->aimvel);
+        *((fix16_t *)buf) = pak->q16aimvel;
+        buf += sizeof(pak->q16aimvel);
+        *((fix16_t *)buf) = pak->q16horiz;
+        buf += sizeof(pak->q16horiz);
         SET(*base_ptr, BIT(3));
     }
 
@@ -352,6 +360,7 @@ int DecodeBits(SW_PACKET *pak, SW_PACKET *old_pak, uint8_t* buf)
 
     *pak = *old_pak;
 
+    // TODO: Properly copy the values in a cross-platform manner
     if (TEST(*base_ptr, BIT(0)))
     {
         pak->vel = *(short *)buf;
@@ -366,14 +375,18 @@ int DecodeBits(SW_PACKET *pak, SW_PACKET *old_pak, uint8_t* buf)
 
     if (TEST(*base_ptr, BIT(2)))
     {
-        pak->angvel = *(char *)buf;
-        buf += sizeof(pak->angvel);
+        pak->q16angvel = *(fix16_t *)buf;
+        buf += sizeof(pak->q16angvel);
+        pak->q16ang = *(fix16_t *)buf;
+        buf += sizeof(pak->q16ang);
     }
 
     if (TEST(*base_ptr, BIT(3)))
     {
-        pak->aimvel = *(char *)buf;
-        buf += sizeof(pak->aimvel);
+        pak->q16aimvel = *(fix16_t *)buf;
+        buf += sizeof(pak->q16aimvel);
+        pak->q16horiz = *(fix16_t *)buf;
+        buf += sizeof(pak->q16horiz);
     }
 
     //won't work if > 4 bytes
@@ -448,7 +461,7 @@ SW_SendMessage(short pnum, const char *text)
 void
 InitNetPlayerOptions(void)
 {
-    short pnum;
+//    short pnum;
     PLAYERp pp = Player + myconnectindex;
     PACKET_OPTIONS p;
 
@@ -485,7 +498,7 @@ InitNetPlayerOptions(void)
 void
 SendMulitNameChange(char *new_name)
 {
-    short pnum;
+//    short pnum;
     PLAYERp pp = Player + myconnectindex;
     PACKET_NAME_CHANGE p;
 
@@ -512,7 +525,7 @@ SendMulitNameChange(char *new_name)
 void
 SendVersion(int version)
 {
-    short pnum;
+//    short pnum;
     PLAYERp pp = Player + myconnectindex;
     PACKET_VERSION p;
 
@@ -537,7 +550,6 @@ void
 CheckVersion(int GameVersion)
 {
     short pnum;
-    PACKET_VERSION p;
 #define VERSION_MSG "You cannot play with different versions!"
 
     if (!CommEnabled)
@@ -576,9 +588,6 @@ CheckVersion(int GameVersion)
 void
 Connect(void)
 {
-    int players_found, i, yline;
-    short other;
-
     if (CommEnabled)
     {
 #if 0
@@ -591,7 +600,7 @@ Connect(void)
         x2 = x1 + screensize - 1;
         y1 = ((ydim) >> 1) - (((screensize * (ydim)) / xdim) >> 1);
         y2 = y1 + ((screensize * (ydim)) / xdim) - 1;
-        rotatespritetile(0L, 0L, BorderTest[gs.BorderTile], 0, x1, y1, x2, y2, 0);
+        rotatespritetile(BorderTest[gs.BorderTile], 0, x1, y1, x2, y2, 0);
         nextpage();
 #endif
 
@@ -601,14 +610,12 @@ Connect(void)
     //InitTimingVars();                   // resettiming();
 }
 
-int wfe_Clock;
 SWBOOL (*wfe_ExitCallback)(void);
 
 void
 waitforeverybody(void)
 {
     int i, size = 1;
-    short other;
 
     if (!CommEnabled)
         return;
@@ -660,7 +667,7 @@ waitforeverybody(void)
             // allow exit
             //if (KEY_PRESSED(KEYSC_ESC))
             {
-                short pnum;
+//                short pnum;
                 //TRAVERSE_CONNECT(pnum)
                 {
                     //if (pnum != myconnectindex)
@@ -704,7 +711,6 @@ SWBOOL MyCommPlayerQuit(void)
     PLAYERp pp;
     short i;
     short prev_player = 0;
-    extern SWBOOL QuitFlag;
     short found = FALSE;
     short quit_player_index = 0;
 
@@ -712,7 +718,17 @@ SWBOOL MyCommPlayerQuit(void)
     {
         if (TEST_SYNC_KEY(Player + i, SK_QUIT_GAME))
         {
-            short pnum;
+            if (!NetBroadcastMode && i == connecthead)
+            {
+                // If it's the master, it should first send quit message to the slaves.
+                // Each slave should automatically quit after receiving the message.
+                if (i == myconnectindex)
+                    continue;
+                QuitFlag = TRUE;
+                ready2send = 0;
+                return TRUE;
+            }
+
             found = TRUE;
 
             quit_player_index = i;
@@ -784,7 +800,6 @@ SWBOOL MyCommPlayerQuit(void)
 
 SWBOOL MenuCommPlayerQuit(short quit_player)
 {
-    PLAYERp pp;
     short i;
     short prev_player = 0;
     short pnum;
@@ -801,8 +816,6 @@ SWBOOL MenuCommPlayerQuit(short quit_player)
 
     TRAVERSE_CONNECT(i)
     {
-        pp = Player + i;
-
         // have to reorder the connect list
         if (i != quit_player)
         {
@@ -836,7 +849,7 @@ SWBOOL MenuCommPlayerQuit(short quit_player)
 void ErrorCorrectionQuit(void)
 {
     int oldtotalclock;
-    short i,j;
+    short j;
 
     if (CommPlayers > 1)
     {
@@ -934,11 +947,9 @@ AddSyncInfoToPacket(int *j)
 void
 faketimerhandler(void)
 {
-    short other, packbufleng;
-    int i, j, k, l;
+    int i, j, k;
     PLAYERp pp;
-    short pnum;
-    void getinput(SW_PACKET *);
+    void getinput(SW_PACKET *, SWBOOL);
     extern SWBOOL BotMode;
 
 #if 0
@@ -969,13 +980,17 @@ faketimerhandler(void)
     if (Player[myconnectindex].movefifoend - movefifoplc >= 100)
         return;
 
-    getinput(&loc);
+    getinput(&loc, FALSE);
 
     AveragePacket.vel += loc.vel;
     AveragePacket.svel += loc.svel;
-    AveragePacket.angvel += loc.angvel;
-    AveragePacket.aimvel += loc.aimvel;
+    AveragePacket.q16angvel += loc.q16angvel;
+    AveragePacket.q16aimvel += loc.q16aimvel;
+    AveragePacket.q16ang = Player[myconnectindex].camq16ang;
+    AveragePacket.q16horiz = Player[myconnectindex].camq16horiz;
     SET(AveragePacket.bits, loc.bits);
+
+    Bmemset(&loc, 0, sizeof(loc));
 
     pp = Player + myconnectindex;
 
@@ -991,14 +1006,17 @@ faketimerhandler(void)
 
     loc.vel = AveragePacket.vel / MovesPerPacket;
     loc.svel = AveragePacket.svel / MovesPerPacket;
-    loc.angvel = AveragePacket.angvel / MovesPerPacket;
-    loc.aimvel = AveragePacket.aimvel / MovesPerPacket;
+    loc.q16angvel = fix16_div(AveragePacket.q16angvel, fix16_from_int(MovesPerPacket));
+    loc.q16aimvel = fix16_div(AveragePacket.q16aimvel, fix16_from_int(MovesPerPacket));
+    loc.q16ang = AveragePacket.q16ang;
+    loc.q16horiz = AveragePacket.q16horiz;
     loc.bits = AveragePacket.bits;
 
     memset(&AveragePacket, 0, sizeof(AveragePacket));
 
     pp->inputfifo[Player[myconnectindex].movefifoend & (MOVEFIFOSIZ - 1)] = loc;
     pp->movefifoend++;
+    Bmemset(&loc, 0, sizeof(loc));
 
 #if 0
 //  AI Bot stuff
@@ -1059,6 +1077,15 @@ faketimerhandler(void)
         else if (i < 0)
             bufferjitter -= ((2 - i) >> 2);
     }
+
+    // If this isn't the master, and the player decided to quit, leave
+    // the game after sending the message. Otherwise, before processing
+    // local message with SK_QUIT bit, we may wait in MoveLoop for another
+    // message with input from one of the peers, only to never get any,
+    // as the peer in question already removed this player from its list.
+    if ((NetBroadcastMode || (myconnectindex != connecthead)) &&
+        TEST(pp->inputfifo[(pp->movefifoend - 1) & (MOVEFIFOSIZ - 1)].bits, BIT(SK_QUIT_GAME)))
+        QuitFlag = TRUE;
 
     if (NetBroadcastMode)
     {
@@ -1242,6 +1269,9 @@ faketimerhandler(void)
                playerquitflag[i] = 1;
             */
         }
+        // Master player should quit only after notifying all peers
+        if (TEST(Player[myconnectindex].inputfifo[movefifosendplc & (MOVEFIFOSIZ - 1)].bits, BIT(SK_QUIT_GAME)))
+            QuitFlag = TRUE;
 
         movefifosendplc += MovesPerPacket;
     }
@@ -1256,7 +1286,7 @@ void
 getpackets(void)
 {
     int otherconnectindex, packbufleng;
-    int i, j, k, l, fifoCheck, sb;
+    int i, j, sb;
     PLAYERp pp;
     SW_PACKET tempinput;
 
@@ -1348,7 +1378,7 @@ getpackets(void)
 
 #if !BIT_CODEC
                 if (i != myconnectindex)
-                    memcpy(&pp->inputfifo[pp->movefifoend & (MOVEFIFOSIZ - 1)], &packbuf[j], sizeof(SW_PACKET));
+                    memcpy(&pp->inputfifo[pp->movefifoend++ & (MOVEFIFOSIZ - 1)], &packbuf[j], sizeof(SW_PACKET));
                 j += sizeof(SW_PACKET);
 #else
                 if (i == myconnectindex)
@@ -1362,10 +1392,9 @@ getpackets(void)
                     j += DecodeBits(&pp->inputfifo[(pp->movefifoend) & (MOVEFIFOSIZ - 1)],
                                     &pp->inputfifo[(pp->movefifoend - 1) & (MOVEFIFOSIZ - 1)],
                                     &packbuf[j]);
+                    pp->movefifoend++;
                 }
 #endif
-
-                pp->movefifoend++;
             }
 
             while (j != packbufleng)
@@ -1386,9 +1415,9 @@ getpackets(void)
                 j += NumSyncBytes;
             }
 
-            // #if SYNC_TEST   //This doesn't work right in this case
-            // GetSyncInfoFromPacket(packbufleng, &j, otherconnectindex);
-            // #endif
+#if SYNC_TEST
+            GetSyncInfoFromPacket(packbuf, packbufleng, &j, otherconnectindex);
+#endif
 
             for (i=connecthead; i>=0; i=connectpoint2[i])
                 if (i != myconnectindex)
@@ -1452,9 +1481,8 @@ getpackets(void)
 
             PlaySound(DIGI_PMESSAGE,&tp->posx,&tp->posy,&tp->posz,v3df_dontpan);
 
-            memcpy(ds,&packbuf[3],packbufleng-3);
-            ds[packbufleng-3] = 0;
-            //sprintf(ds, "%s",&packbuf[3]);
+            memcpy(ds,&packbuf[1],packbufleng-1);
+            ds[packbufleng-1] = 0;
             adduserquote(ds);
             break;
         }

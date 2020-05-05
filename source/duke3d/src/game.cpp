@@ -120,10 +120,6 @@ int32_t hud_showmapname = 1;
 
 int32_t g_levelTextTime = 0;
 
-int32_t r_maxfps = -1;
-int32_t r_maxfpsoffset;
-uint64_t g_frameDelay;
-
 #if defined(RENDERTYPEWIN) && defined(USE_OPENGL)
 extern char forcegl;
 #endif
@@ -1541,65 +1537,10 @@ int A_Spawn(int spriteNum, int tileNum)
 #endif
         switch (DYNAMICTILEMAP(pSprite->picnum))
         {
-        default:
-            if (G_HaveActor(pSprite->picnum))
-            {
-                if (spriteNum == -1 && pSprite->lotag > ud.player_skill)
-                {
-                    pSprite->xrepeat = pSprite->yrepeat = 0;
-                    changespritestat(newSprite, STAT_MISC);
-                    break;
-                }
-
-                //  Init the size
-                if (pSprite->xrepeat == 0 || pSprite->yrepeat == 0)
-                    pSprite->xrepeat = pSprite->yrepeat = 1;
-
-                if (A_CheckSpriteFlags(newSprite, SFLAG_BADGUY))
-                {
-                    if (ud.monsters_off == 1)
-                    {
-                        pSprite->xrepeat = pSprite->yrepeat = 0;
-                        changespritestat(newSprite, STAT_MISC);
-                        break;
-                    }
-
-                    A_Fall(newSprite);
-
-                    if (A_CheckSpriteFlags(newSprite, SFLAG_BADGUYSTAYPUT))
-                        pActor->stayput = pSprite->sectnum;
-
-                    g_player[myconnectindex].ps->max_actors_killed++;
-                    pSprite->clipdist = 80;
-
-                    if (spriteNum >= 0)
-                    {
-                        if (sprite[spriteNum].picnum == RESPAWN)
-                            pActor->tempang = sprite[newSprite].pal = sprite[spriteNum].pal;
-
-                        A_PlayAlertSound(newSprite);
-                        changespritestat(newSprite, STAT_ACTOR);
-                    }
-                    else
-                        changespritestat(newSprite, STAT_ZOMBIEACTOR);
-                }
-                else
-                {
-                    pSprite->clipdist = 40;
-                    pSprite->owner    = newSprite;
-                    changespritestat(newSprite, STAT_ACTOR);
-                }
-
-                pActor->timetosleep = 0;
-
-                if (spriteNum >= 0)
-                    pSprite->ang = sprite[spriteNum].ang;
-            }
-            break;
         case FOF__STATIC:
             pSprite->xrepeat = pSprite->yrepeat = 0;
             changespritestat(newSprite, STAT_MISC);
-            break;
+            goto SPAWN_END;
         case CAMERA1__STATIC:
             pSprite->extra = 1;
             pSprite->cstat &= 32768;
@@ -1617,7 +1558,7 @@ int A_Spawn(int spriteNum, int tileNum)
                 pSprite->pal = 0;
                 changespritestat(newSprite, STAT_ACTOR);
             }
-            break;
+            goto SPAWN_END;
 #ifndef EDUKE32_STANDALONE
         case CAMERAPOLE__STATIC:
             pSprite->extra = 1;
@@ -1634,7 +1575,7 @@ int A_Spawn(int spriteNum, int tileNum)
             }
             else
                 pSprite->pal = 0;
-            break;
+            goto SPAWN_END;
 
         case BOLT1__STATIC:
         case SIDEBOLT1__STATIC:
@@ -1643,7 +1584,7 @@ int A_Spawn(int spriteNum, int tileNum)
             pSprite->yvel = 0;
 
             changespritestat(newSprite, STAT_STANDABLE);
-            break;
+            goto SPAWN_END;
 
         case WATERSPLASH2__STATIC:
             if (spriteNum >= 0)
@@ -1700,7 +1641,7 @@ int A_Spawn(int spriteNum, int tileNum)
         case DUKEGUN__STATIC:
         case DUKELEG__STATIC:
             changespritestat(newSprite, STAT_MISC);
-            break;
+            goto SPAWN_END;
         case TONGUE__STATIC:
             if (spriteNum >= 0)
                 pSprite->ang = sprite[spriteNum].ang;
@@ -1708,14 +1649,15 @@ int A_Spawn(int spriteNum, int tileNum)
             pSprite->zvel = 256-(krand()&511);
             pSprite->xvel = 64-(krand()&127);
             changespritestat(newSprite, STAT_PROJECTILE);
-            break;
+            goto SPAWN_END;
         case NATURALLIGHTNING__STATIC:
             pSprite->cstat &= ~257;
             pSprite->cstat |= 32768;
-            break;
+            goto SPAWN_END;
         case TRANSPORTERSTAR__STATIC:
         case TRANSPORTERBEAM__STATIC:
-            if (spriteNum == -1) break;
+            if (spriteNum == -1)
+                goto SPAWN_END;
             if (pSprite->picnum == TRANSPORTERBEAM)
             {
                 pSprite->xrepeat = 31;
@@ -1743,12 +1685,12 @@ int A_Spawn(int spriteNum, int tileNum)
             changespritestat(newSprite, STAT_MISC);
             A_SetSprite(newSprite,CLIPMASK0);
             setsprite(newSprite,&pSprite->pos);
-            break;
+            goto SPAWN_END;
         case FEMMAG1__STATIC:
         case FEMMAG2__STATIC:
             pSprite->cstat &= ~257;
             changespritestat(newSprite, STAT_DEFAULT);
-            break;
+            goto SPAWN_END;
         case DUKETAG__STATIC:
         case SIGN1__STATIC:
         case SIGN2__STATIC:
@@ -1758,7 +1700,7 @@ int A_Spawn(int spriteNum, int tileNum)
                 changespritestat(newSprite, STAT_MISC);
             }
             else pSprite->pal = 0;
-            break;
+            goto SPAWN_END;
 
         case MASKWALL1__STATIC:
         case MASKWALL2__STATIC:
@@ -1779,7 +1721,7 @@ int A_Spawn(int spriteNum, int tileNum)
             int const j    = pSprite->cstat & SPAWN_PROTECT_CSTAT_MASK;
             pSprite->cstat = j | CSTAT_SPRITE_BLOCK;
             changespritestat(newSprite, STAT_DEFAULT);
-            break;
+            goto SPAWN_END;
         }
 
         case PODFEM1__STATIC:
@@ -1805,14 +1747,14 @@ int A_Spawn(int spriteNum, int tileNum)
             pSprite->cstat   |= 257;
             pSprite->clipdist = 32;
             changespritestat(newSprite, STAT_ZOMBIEACTOR);
-            break;
+            goto SPAWN_END;
 
         case QUEBALL__STATIC:
         case STRIPEBALL__STATIC:
             pSprite->cstat    = 256;
             pSprite->clipdist = 8;
             changespritestat(newSprite, STAT_ZOMBIEACTOR);
-            break;
+            goto SPAWN_END;
 
         case DUKELYINGDEAD__STATIC:
             if (spriteNum >= 0 && sprite[spriteNum].picnum == APLAYER)
@@ -1835,28 +1777,28 @@ int A_Spawn(int spriteNum, int tileNum)
             pSprite->cstat   |= 257;
             pSprite->clipdist = 128;
             changespritestat(newSprite, STAT_ACTOR);
-            break;
+            goto SPAWN_END;
 
         case RESPAWNMARKERRED__STATIC:
             pSprite->xrepeat = pSprite->yrepeat = 24;
             if (spriteNum >= 0)
                 pSprite->z = actor[spriteNum].floorz;  // -(1<<4);
             changespritestat(newSprite, STAT_ACTOR);
-            break;
+            goto SPAWN_END;
 
         case MIKE__STATIC:
             pSprite->yvel  = pSprite->hitag;
             pSprite->hitag = 0;
             changespritestat(newSprite, STAT_ACTOR);
-            break;
+            goto SPAWN_END;
         case WEATHERWARN__STATIC:
             changespritestat(newSprite, STAT_ACTOR);
-            break;
+            goto SPAWN_END;
 
         case SPOTLITE__STATIC:
             T1(newSprite) = pSprite->x;
             T2(newSprite) = pSprite->y;
-            break;
+            goto SPAWN_END;
         case BULLETHOLE__STATIC:
             pSprite->xrepeat = 3;
             pSprite->yrepeat = 3;
@@ -1864,7 +1806,7 @@ int A_Spawn(int spriteNum, int tileNum)
 
             A_AddToDeleteQueue(newSprite);
             changespritestat(newSprite, STAT_MISC);
-            break;
+            goto SPAWN_END;
 
         case MONEY__STATIC:
         case MAIL__STATIC:
@@ -1877,7 +1819,7 @@ int A_Spawn(int spriteNum, int tileNum)
             pSprite->ang     = krand() & 2047;
 
             changespritestat(newSprite, STAT_MISC);
-            break;
+            goto SPAWN_END;
 
         case SHELL__STATIC: //From the player
         case SHOTGUNSHELL__STATIC:
@@ -1926,7 +1868,7 @@ int A_Spawn(int spriteNum, int tileNum)
 
                 changespritestat(newSprite, STAT_MISC);
             }
-            break;
+            goto SPAWN_END;
 
         case WATERBUBBLE__STATIC:
             if (spriteNum >= 0)
@@ -1939,7 +1881,7 @@ int A_Spawn(int spriteNum, int tileNum)
 
             pSprite->xrepeat = pSprite->yrepeat = 4;
             changespritestat(newSprite, STAT_MISC);
-            break;
+            goto SPAWN_END;
 
         case CRANE__STATIC:
 
@@ -1983,13 +1925,13 @@ int A_Spawn(int spriteNum, int tileNum)
             pSprite->owner = -1;
             pSprite->extra = 8;
             changespritestat(newSprite, STAT_STANDABLE);
-            break;
+            goto SPAWN_END;
 
         case TRASH__STATIC:
             pSprite->ang = krand()&2047;
             pSprite->xrepeat = pSprite->yrepeat = 24;
             changespritestat(newSprite, STAT_STANDABLE);
-            break;
+            goto SPAWN_END;
 
         case WATERDRIP__STATIC:
             if (spriteNum >= 0 && (sprite[spriteNum].statnum == STAT_PLAYER || sprite[spriteNum].statnum == STAT_ACTOR))
@@ -2017,20 +1959,26 @@ int A_Spawn(int spriteNum, int tileNum)
         case WATERDRIPSPLASH__STATIC:
             pSprite->xrepeat = pSprite->yrepeat = 24;
             changespritestat(newSprite, STAT_STANDABLE);
-            break;
+            goto SPAWN_END;
 
         case PLUG__STATIC:
             pSprite->lotag = 9999;
             changespritestat(newSprite, STAT_STANDABLE);
-            break;
+            goto SPAWN_END;
         case TARGET__STATIC:
         case DUCK__STATIC:
         case LETTER__STATIC:
             pSprite->extra = 1;
             pSprite->cstat |= 257;
             changespritestat(newSprite, STAT_ACTOR);
-            break;
+            goto SPAWN_END;
 
+        case BOSS2STAYPUT__STATIC:
+        case BOSS3STAYPUT__STATIC:
+        case BOSS5STAYPUT__STATIC:
+            if (!WORLDTOUR)
+                break;
+            fallthrough__;
         case OCTABRAINSTAYPUT__STATIC:
         case LIZTROOPSTAYPUT__STATIC:
         case PIGCOPSTAYPUT__STATIC:
@@ -2041,15 +1989,20 @@ int A_Spawn(int spriteNum, int tileNum)
         case BOSS4STAYPUT__STATIC:
             pActor->stayput = pSprite->sectnum;
             fallthrough__;
+        case GREENSLIME__STATIC:
+            if (pSprite->picnum == GREENSLIME)
+                pSprite->extra = 1;
+            fallthrough__;
+        case BOSS5__STATIC:
+        case FIREFLY__STATIC:
+            if (!WORLDTOUR && (pSprite->picnum == BOSS5 || pSprite->picnum == FIREFLY))
+                break;
+            fallthrough__;
         case BOSS1__STATIC:
         case BOSS2__STATIC:
         case BOSS3__STATIC:
         case BOSS4__STATIC:
         case ROTATEGUN__STATIC:
-        case GREENSLIME__STATIC:
-            if (pSprite->picnum == GREENSLIME)
-                pSprite->extra = 1;
-            fallthrough__;
         case DRONE__STATIC:
         case LIZTROOPONTOILET__STATIC:
         case LIZTROOPJUSTSIT__STATIC:
@@ -2090,12 +2043,14 @@ int A_Spawn(int spriteNum, int tileNum)
             }
 
             if (pSprite->picnum == BOSS4STAYPUT || pSprite->picnum == BOSS1 || pSprite->picnum == BOSS2 ||
-                pSprite->picnum == BOSS1STAYPUT || pSprite->picnum == BOSS3 || pSprite->picnum == BOSS4)
+                pSprite->picnum == BOSS1STAYPUT || pSprite->picnum == BOSS3 || pSprite->picnum == BOSS4 ||
+                (WORLDTOUR && (pSprite->picnum == BOSS2STAYPUT || pSprite->picnum == BOSS3STAYPUT ||
+                pSprite->picnum == BOSS5STAYPUT || pSprite->picnum == BOSS5)))
             {
                 if (spriteNum >= 0 && sprite[spriteNum].picnum == RESPAWN)
                     pSprite->pal = sprite[spriteNum].pal;
 
-                if (pSprite->pal)
+                if (pSprite->pal && (!WORLDTOUR || pSprite->pal != 22))
                 {
                     pSprite->clipdist = 80;
                     pSprite->xrepeat  = pSprite->yrepeat = 40;
@@ -2129,7 +2084,7 @@ int A_Spawn(int spriteNum, int tileNum)
             {
                 pSprite->xrepeat=pSprite->yrepeat=0;
                 changespritestat(newSprite, STAT_MISC);
-                break;
+                goto SPAWN_END;
             }
             else
             {
@@ -2163,7 +2118,7 @@ int A_Spawn(int spriteNum, int tileNum)
             if (pSprite->picnum == ROTATEGUN)
                 pSprite->zvel = 0;
 
-            break;
+            goto SPAWN_END;
 
         case REACTOR2__STATIC:
         case REACTOR__STATIC:
@@ -2173,14 +2128,14 @@ int A_Spawn(int spriteNum, int tileNum)
             {
                 pSprite->xrepeat = pSprite->yrepeat = 0;
                 changespritestat(newSprite, STAT_MISC);
-                break;
+                goto SPAWN_END;
             }
 
             pSprite->pal   = 0;
             pSprite->shade = -17;
 
             changespritestat(newSprite, STAT_ZOMBIEACTOR);
-            break;
+            goto SPAWN_END;
 
         case HEAVYHBOMB__STATIC:
             if (spriteNum >= 0)
@@ -2195,13 +2150,13 @@ int A_Spawn(int spriteNum, int tileNum)
             {
                 pSprite->xrepeat = pSprite->yrepeat = 0;
                 changespritestat(newSprite, STAT_MISC);
-                break;
+                goto SPAWN_END;
             }
             pSprite->pal   = 0;
             pSprite->shade = -17;
 
             changespritestat(newSprite, STAT_ZOMBIEACTOR);
-            break;
+            goto SPAWN_END;
 
         case RECON__STATIC:
             if (pSprite->lotag > ud.player_skill)
@@ -2216,7 +2171,7 @@ int A_Spawn(int spriteNum, int tileNum)
             {
                 pSprite->xrepeat = pSprite->yrepeat = 0;
                 changespritestat(newSprite, STAT_MISC);
-                break;
+                goto SPAWN_END;
             }
             pSprite->extra = 130;
             pSprite->cstat |= 256; // Make it hitable
@@ -2225,13 +2180,19 @@ int A_Spawn(int spriteNum, int tileNum)
             {
                 pSprite->xrepeat = pSprite->yrepeat = 0;
                 changespritestat(newSprite, STAT_MISC);
-                break;
+                goto SPAWN_END;
             }
             pSprite->pal   = 0;
             pSprite->shade = -17;
 
             changespritestat(newSprite, STAT_ZOMBIEACTOR);
-            break;
+            goto SPAWN_END;
+
+        case FLAMETHROWERSPRITE__STATIC:
+        case FLAMETHROWERAMMO__STATIC:
+            if (!WORLDTOUR)
+                break;
+            fallthrough__;
 
         case ATOMICHEALTH__STATIC:
         case STEROIDS__STATIC:
@@ -2283,7 +2244,7 @@ int A_Spawn(int spriteNum, int tileNum)
             {
                 pSprite->xrepeat = pSprite->yrepeat = 0;
                 changespritestat(newSprite, STAT_MISC);
-                break;
+                goto SPAWN_END;
             }
 
             pSprite->pal = 0;
@@ -2297,7 +2258,7 @@ int A_Spawn(int spriteNum, int tileNum)
             {
                 pSprite->xrepeat = pSprite->yrepeat = 0;
                 changespritestat(newSprite, STAT_MISC);
-                break;
+                goto SPAWN_END;
             }
             else
             {
@@ -2317,7 +2278,7 @@ int A_Spawn(int spriteNum, int tileNum)
                 changespritestat(newSprite, STAT_ZOMBIEACTOR);
                 A_Fall(newSprite);
             }
-            break;
+            goto SPAWN_END;
 
         case WATERFOUNTAIN__STATIC:
             SLT(newSprite) = 1;
@@ -2330,12 +2291,12 @@ int A_Spawn(int spriteNum, int tileNum)
             pSprite->cstat = 257; // Make it hitable
             sprite[newSprite].extra = 1;
             changespritestat(newSprite, STAT_STANDABLE);
-            break;
+            goto SPAWN_END;
 
         case FLOORFLAME__STATIC:
             pSprite->shade = -127;
             changespritestat(newSprite, STAT_STANDABLE);
-            break;
+            goto SPAWN_END;
 
         case BOUNCEMINE__STATIC:
             pSprite->owner = newSprite;
@@ -2344,7 +2305,7 @@ int A_Spawn(int spriteNum, int tileNum)
             pSprite->shade = -127;
             pSprite->extra = g_impactDamage<<2;
             changespritestat(newSprite, STAT_ZOMBIEACTOR);
-            break;
+            goto SPAWN_END;
 
         case STEAM__STATIC:
             if (spriteNum >= 0)
@@ -2358,7 +2319,7 @@ int A_Spawn(int spriteNum, int tileNum)
             fallthrough__;
         case CEILINGSTEAM__STATIC:
             changespritestat(newSprite, STAT_STANDABLE);
-            break;
+            goto SPAWN_END;
 
         case TOILET__STATIC:
         case STALL__STATIC:
@@ -2366,7 +2327,7 @@ int A_Spawn(int spriteNum, int tileNum)
             pSprite->cstat |= 257;
             pSprite->clipdist = 8;
             pSprite->owner = newSprite;
-            break;
+            goto SPAWN_END;
 
         case CANWITHSOMETHING__STATIC:
         case CANWITHSOMETHING2__STATIC:
@@ -2404,12 +2365,12 @@ int A_Spawn(int spriteNum, int tileNum)
                 pSprite->cstat = 257|(krand()&4);
                 changespritestat(newSprite, STAT_ZOMBIEACTOR);
             }
-            break;
+            goto SPAWN_END;
 
         case TOILETWATER__STATIC:
             pSprite->shade = -16;
             changespritestat(newSprite, STAT_STANDABLE);
-            break;
+            goto SPAWN_END;
 
         case LASERLINE__STATIC:
             pSprite->yrepeat = 6;
@@ -2427,7 +2388,7 @@ int A_Spawn(int spriteNum, int tileNum)
 
             if (spriteNum >= 0) pSprite->ang = actor[spriteNum].t_data[5]+512;
             changespritestat(newSprite, STAT_MISC);
-            break;
+            goto SPAWN_END;
 
         case FORCESPHERE__STATIC:
             if (spriteNum == -1)
@@ -2440,7 +2401,7 @@ int A_Spawn(int spriteNum, int tileNum)
                 pSprite->xrepeat = pSprite->yrepeat = 1;
                 changespritestat(newSprite, STAT_MISC);
             }
-            break;
+            goto SPAWN_END;
 
         case BLOOD__STATIC:
             pSprite->xrepeat = pSprite->yrepeat = 16;
@@ -2448,7 +2409,12 @@ int A_Spawn(int spriteNum, int tileNum)
             if (spriteNum >= 0 && sprite[spriteNum].pal == 6)
                 pSprite->pal = 6;
             changespritestat(newSprite, STAT_MISC);
-            break;
+            goto SPAWN_END;
+
+        case LAVAPOOL__STATIC:
+            if (!WORLDTOUR)
+                break;
+            fallthrough__;
         case BLOODPOOL__STATIC:
         case PUKE__STATIC:
         {
@@ -2476,13 +2442,13 @@ int A_Spawn(int spriteNum, int tileNum)
             zero_puke:
                 pSprite->xrepeat = pSprite->yrepeat = 0;
                 changespritestat(newSprite, STAT_MISC);
-                break;
+                goto SPAWN_END;
             }
 
             if (sector[sectNum].lotag == ST_1_ABOVE_WATER)
             {
                 changespritestat(newSprite, STAT_MISC);
-                break;
+                goto SPAWN_END;
             }
 
             if (spriteNum >= 0 && pSprite->picnum != PUKE)
@@ -2498,13 +2464,15 @@ int A_Spawn(int spriteNum, int tileNum)
                     pSprite->shade = 127;
             }
             pSprite->cstat |= 32;
+            if (pSprite->picnum == LAVAPOOL)
+                pSprite->z = getflorzofslope(pSprite->sectnum, pSprite->x, pSprite->y) - 200;
             fallthrough__;
         }
         case FECES__STATIC:
             if (spriteNum >= 0)
                 pSprite->xrepeat = pSprite->yrepeat = 1;
             changespritestat(newSprite, STAT_MISC);
-            break;
+            goto SPAWN_END;
 
         case BLOODSPLAT1__STATIC:
         case BLOODSPLAT2__STATIC:
@@ -2520,14 +2488,14 @@ int A_Spawn(int spriteNum, int tileNum)
 
             A_AddToDeleteQueue(newSprite);
             changespritestat(newSprite, STAT_MISC);
-            break;
+            goto SPAWN_END;
 
         case TRIPBOMB__STATIC:
             if (pSprite->lotag > ud.player_skill)
             {
                 pSprite->xrepeat = pSprite->yrepeat = 0;
                 changespritestat(newSprite, STAT_MISC);
-                break;
+                goto SPAWN_END;
             }
 
             pSprite->xrepeat = 4;
@@ -2543,18 +2511,18 @@ int A_Spawn(int spriteNum, int tileNum)
             pActor->t_data[5] = pSprite->ang;
 
             changespritestat(newSprite, STAT_ZOMBIEACTOR);
-            break;
+            goto SPAWN_END;
 
         case SPACEMARINE__STATIC:
             pSprite->extra = 20;
             pSprite->cstat |= 257;
             changespritestat(newSprite, STAT_ZOMBIEACTOR);
-            break;
+            goto SPAWN_END;
         case DOORSHOCK__STATIC:
             pSprite->cstat |= 1+256;
             pSprite->shade = -12;
             changespritestat(newSprite, STAT_STANDABLE);
-            break;
+            goto SPAWN_END;
         case HYDRENT__STATIC:
         case PANNEL1__STATIC:
         case PANNEL2__STATIC:
@@ -2626,10 +2594,11 @@ int A_Spawn(int spriteNum, int tileNum)
             fallthrough__;
         case OCEANSPRITE4__STATIC:
             changespritestat(newSprite, STAT_DEFAULT);
-            break;
+            goto SPAWN_END;
 
         case FRAMEEFFECT1_13__STATIC:
-            if (PLUTOPAK) break;
+            if (PLUTOPAK)
+                break;
             fallthrough__;
         case FRAMEEFFECT1__STATIC:
             if (spriteNum >= 0)
@@ -2642,7 +2611,7 @@ int A_Spawn(int spriteNum, int tileNum)
 
             changespritestat(newSprite, STAT_MISC);
 
-            break;
+            goto SPAWN_END;
         case FOOTPRINTS__STATIC:
         case FOOTPRINTS2__STATIC:
         case FOOTPRINTS3__STATIC:
@@ -2665,7 +2634,7 @@ int A_Spawn(int spriteNum, int tileNum)
                             {
                                 pSprite->xrepeat = pSprite->yrepeat = 0;
                                 changespritestat(newSprite, STAT_MISC);
-                                break;
+                                goto SPAWN_END;
                             }
                         }
                         else goto zero_footprint;
@@ -2676,7 +2645,7 @@ int A_Spawn(int spriteNum, int tileNum)
                 {
                 zero_footprint:
                     pSprite->xrepeat = pSprite->yrepeat = 0;
-                    break;
+                    goto SPAWN_END;
                 }
 
                 pSprite->cstat = 32 + ((g_player[P_Get(spriteNum)].ps->footprintcount & 1) << 2);
@@ -2690,14 +2659,14 @@ int A_Spawn(int spriteNum, int tileNum)
 
             A_AddToDeleteQueue(newSprite);
             changespritestat(newSprite, STAT_MISC);
-            break;
+            goto SPAWN_END;
 
         case VIEWSCREEN__STATIC:
         case VIEWSCREEN2__STATIC:
             pSprite->owner = newSprite;
             pSprite->lotag = pSprite->extra = 1;
             changespritestat(newSprite, STAT_STANDABLE);
-            break;
+            goto SPAWN_END;
         case RESPAWN__STATIC:
             pSprite->extra = 66-13;
             fallthrough__;
@@ -2706,11 +2675,11 @@ int A_Spawn(int spriteNum, int tileNum)
             {
                 pSprite->xrepeat = pSprite->yrepeat = 0;
                 changespritestat(newSprite, STAT_MISC);
-                break;
+                goto SPAWN_END;
             }
             pSprite->cstat = 32768;
             changespritestat(newSprite, STAT_FX);
-            break;
+            goto SPAWN_END;
 
         case EXPLOSION2__STATIC:
 #ifdef POLYMER
@@ -2722,6 +2691,10 @@ int A_Spawn(int spriteNum, int tileNum)
             fallthrough__;
 #endif
 #ifndef EDUKE32_STANDALONE
+        case ONFIRE__STATIC:
+            if (!WORLDTOUR && pSprite->picnum == ONFIRE)
+                break;
+            fallthrough__;
         case EXPLOSION2BOT__STATIC:
         case BURNING__STATIC:
         case BURNING2__STATIC:
@@ -2744,7 +2717,7 @@ int A_Spawn(int spriteNum, int tileNum)
             }
             else if (pSprite->picnum == SHRINKEREXPLOSION)
                 pSprite->xrepeat = pSprite->yrepeat = 32;
-            else if (pSprite->picnum == SMALLSMOKE)
+            else if (pSprite->picnum == SMALLSMOKE || pSprite->picnum == ONFIRE)
             {
                 // 64 "money"
                 pSprite->xrepeat = pSprite->yrepeat = 24;
@@ -2762,9 +2735,17 @@ int A_Spawn(int spriteNum, int tileNum)
                     pSprite->z = floorZ-ZOFFSET4;
             }
 
+            if (pSprite->picnum == ONFIRE)
+            {
+                pActor->bpos.x = pSprite->x += (krand()%256)-128;
+                pActor->bpos.y = pSprite->y += (krand()%256)-128;
+                pActor->bpos.z = pSprite->z -= krand()%10240;
+                pSprite->cstat |= 128;
+            }
+
             changespritestat(newSprite, STAT_MISC);
 
-            break;
+            goto SPAWN_END;
 
         case PLAYERONWATER__STATIC:
             if (spriteNum >= 0)
@@ -2776,7 +2757,7 @@ int A_Spawn(int spriteNum, int tileNum)
                     pSprite->cstat |= 32768;
             }
             changespritestat(newSprite, STAT_DUMMYPLAYER);
-            break;
+            goto SPAWN_END;
 
         case APLAYER__STATIC:
             pSprite->xrepeat = 0;
@@ -2787,7 +2768,7 @@ int A_Spawn(int spriteNum, int tileNum)
                                          || ((g_gametypeFlags[ud.coop] & GAMETYPE_COOPSPAWN) / GAMETYPE_COOPSPAWN) != pSprite->lotag)
                                         ? STAT_MISC
                                         : STAT_PLAYER);
-            break;
+            goto SPAWN_END;
         case TOUCHPLATE__STATIC:
             T3(newSprite) = sector[sectNum].floorz;
 
@@ -2798,7 +2779,7 @@ int A_Spawn(int spriteNum, int tileNum)
             {
                 pSprite->xrepeat=pSprite->yrepeat=0;
                 changespritestat(newSprite, STAT_MISC);
-                break;
+                goto SPAWN_END;
             }
 #ifndef EDUKE32_STANDALONE
             fallthrough__;
@@ -2813,18 +2794,18 @@ int A_Spawn(int spriteNum, int tileNum)
 #endif
             pSprite->cstat |= 32768;
             changespritestat(newSprite, STAT_STANDABLE);
-            break;
+            goto SPAWN_END;
 
         case MASTERSWITCH__STATIC:
             if (pSprite->picnum == MASTERSWITCH)
                 pSprite->cstat |= 32768;
             pSprite->yvel = 0;
             changespritestat(newSprite, STAT_STANDABLE);
-            break;
+            goto SPAWN_END;
         case LOCATORS__STATIC:
             pSprite->cstat |= 32768;
             changespritestat(newSprite, STAT_LOCATOR);
-            break;
+            goto SPAWN_END;
 
         case ACTIVATORLOCKED__STATIC:
         case ACTIVATOR__STATIC:
@@ -2832,7 +2813,7 @@ int A_Spawn(int spriteNum, int tileNum)
             if (pSprite->picnum == ACTIVATORLOCKED)
                 sector[pSprite->sectnum].lotag |= 16384;
             changespritestat(newSprite, STAT_ACTIVATOR);
-            break;
+            goto SPAWN_END;
 
         case OOZ__STATIC:
         case OOZ2__STATIC:
@@ -2856,7 +2837,7 @@ int A_Spawn(int spriteNum, int tileNum)
             pSprite->xrepeat = 25 - (oozSize >> 1);
             pSprite->cstat |= (krand() & 4);
 
-            break;
+            goto SPAWN_END;
         }
 
         case SECTOREFFECTOR__STATIC:
@@ -3422,7 +3403,7 @@ int A_Spawn(int spriteNum, int tileNum)
             }
 
             changespritestat(newSprite, STAT_EFFECTOR);
-            break;
+            goto SPAWN_END;
 
         case SEENINE__STATIC:
         case OOZFILTER__STATIC:
@@ -3439,7 +3420,7 @@ int A_Spawn(int spriteNum, int tileNum)
             pSprite->owner = newSprite;
 
             changespritestat(newSprite, STAT_STANDABLE);
-            break;
+            goto SPAWN_END;
 
         case CRACK1__STATIC:
         case CRACK2__STATIC:
@@ -3461,7 +3442,7 @@ int A_Spawn(int spriteNum, int tileNum)
             {
                 pSprite->xrepeat = pSprite->yrepeat = 0;
                 changespritestat(newSprite, STAT_MISC);
-                break;
+                goto SPAWN_END;
             }
 
             pSprite->pal   = 0;
@@ -3470,8 +3451,101 @@ int A_Spawn(int spriteNum, int tileNum)
 
             changespritestat(newSprite, STAT_STANDABLE);
             A_SetSprite(newSprite,CLIPMASK0);
-            break;
+            goto SPAWN_END;
+
+        case LAVAPOOLBUBBLE__STATIC:
+            if (!WORLDTOUR)
+                break;
+            if (sprite[spriteNum].xrepeat >= 30)
+            {
+                pSprite->owner = spriteNum;
+                changespritestat(newSprite, STAT_MISC);
+                pSprite->xrepeat = pSprite->yrepeat = 1;
+                pSprite->x += (krand()%512)-256;
+                pSprite->y += (krand()%512)-256;
+            }
+            goto SPAWN_END;
+        case WHISPYSMOKE__STATIC:
+            if (!WORLDTOUR)
+                break;
+            pActor->bpos.x = pSprite->x += (krand()%256)-128;
+            pActor->bpos.y = pSprite->y += (krand()%256)-128;
+            pSprite->xrepeat = pSprite->yrepeat = 20;
+            changespritestat(newSprite, STAT_MISC);
+            goto SPAWN_END;
+        case FIREFLYFLYINGEFFECT__STATIC:
+            if (!WORLDTOUR)
+                break;
+            pSprite->owner = spriteNum;
+            changespritestat(newSprite, STAT_MISC);
+            pSprite->xrepeat = pSprite->yrepeat = 1;
+            goto SPAWN_END;
+        case E32_TILE5846__STATIC:
+            if (!WORLDTOUR)
+                break;
+            pSprite->extra = 150;
+            pSprite->cstat |= 257;
+            changespritestat(newSprite, STAT_ZOMBIEACTOR);
+            goto SPAWN_END;
+
+        default:
+            break; // NOT goto
         }
+
+    // implementation of the default case
+    if (G_TileHasActor(pSprite->picnum))
+    {
+        if (spriteNum == -1 && pSprite->lotag > ud.player_skill)
+        {
+            pSprite->xrepeat = pSprite->yrepeat = 0;
+            changespritestat(newSprite, STAT_MISC);
+            goto SPAWN_END;
+        }
+
+        //  Init the size
+        if (pSprite->xrepeat == 0 || pSprite->yrepeat == 0)
+            pSprite->xrepeat = pSprite->yrepeat = 1;
+
+        if (A_CheckSpriteFlags(newSprite, SFLAG_BADGUY))
+        {
+            if (ud.monsters_off == 1)
+            {
+                pSprite->xrepeat = pSprite->yrepeat = 0;
+                changespritestat(newSprite, STAT_MISC);
+                goto SPAWN_END;
+            }
+
+            A_Fall(newSprite);
+
+            if (A_CheckSpriteFlags(newSprite, SFLAG_BADGUYSTAYPUT))
+                pActor->stayput = pSprite->sectnum;
+
+            g_player[myconnectindex].ps->max_actors_killed++;
+            pSprite->clipdist = 80;
+
+            if (spriteNum >= 0)
+            {
+                if (sprite[spriteNum].picnum == RESPAWN)
+                    pActor->tempang = sprite[newSprite].pal = sprite[spriteNum].pal;
+
+                A_PlayAlertSound(newSprite);
+                changespritestat(newSprite, STAT_ACTOR);
+            }
+            else
+                changespritestat(newSprite, STAT_ZOMBIEACTOR);
+        }
+        else
+        {
+            pSprite->clipdist = 40;
+            pSprite->owner    = newSprite;
+            changespritestat(newSprite, STAT_ACTOR);
+        }
+
+        pActor->timetosleep = 0;
+
+        if (spriteNum >= 0)
+            pSprite->ang = sprite[spriteNum].ang;
+    }
 
 SPAWN_END:
     if (VM_HaveEvent(EVENT_SPAWN))
@@ -3781,8 +3855,7 @@ void G_DoSpriteAnimations(int32_t ourx, int32_t oury, int32_t ourz, int32_t oura
             t->z += mulscale16(smoothratio,ps->pos.z-ps->opos.z) -
                 (ps->dead_flag ? 0 : PHEIGHT) + PHEIGHT;
         }
-        else if ((pSprite->statnum == STAT_DEFAULT && pSprite->picnum != CRANEPOLE) || pSprite->statnum == STAT_PLAYER ||
-                 pSprite->statnum == STAT_STANDABLE || pSprite->statnum == STAT_PROJECTILE || pSprite->statnum == STAT_MISC || pSprite->statnum == STAT_ACTOR)
+        else if (pSprite->picnum != CRANEPOLE)
         {
             t->x -= mulscale16(65536-smoothratio,pSprite->x-actor[i].bpos.x);
             t->y -= mulscale16(65536-smoothratio,pSprite->y-actor[i].bpos.y);
@@ -4003,8 +4076,9 @@ void G_DoSpriteAnimations(int32_t ourx, int32_t oury, int32_t ourz, int32_t oura
 
                 if (g_player[playerNum].input->extbits & (1 << 7) && !ud.pause_on && spritesortcnt < maxspritesonscreen)
                 {
-                    auto const playerTyping = t;
+                    auto const playerTyping = &tsprite[spritesortcnt];
 
+                    *playerTyping = *t;
                     playerTyping->statnum = TSPR_TEMP;
                     playerTyping->cstat   = 0;
                     playerTyping->picnum  = RESPAWNMARKERGREEN;
@@ -4148,21 +4222,20 @@ PALONLY:
             break;
         }
 
-        if (G_HaveActor(pSprite->picnum))
+        if (G_TileHasActor(pSprite->picnum))
         {
 #if !defined LUNATIC
             if ((unsigned)scrofs_action + ACTION_PARAM_COUNT > (unsigned)g_scriptSize)
                 goto skip;
 
-            l = apScript[scrofs_action + ACTION_VIEWTYPE];
+            int32_t viewtype = apScript[scrofs_action + ACTION_VIEWTYPE];
             uint16_t const action_flags = apScript[scrofs_action + ACTION_FLAGS];
 #else
-            l = viewtype;
             uint16_t const action_flags = actor[i].ac.flags;
 #endif
 
-            int const invertp = l < 0;
-            l = klabs(l);
+            int const invertp = viewtype < 0;
+            l = klabs(viewtype);
 
             if (tilehasmodelorvoxel(pSprite->picnum,t->pal) && !(spriteext[i].flags&SPREXT_NOTMD))
             {
@@ -4213,13 +4286,13 @@ PALONLY:
             }
 
 #if !defined LUNATIC
-            t->picnum += frameOffset + apScript[scrofs_action + ACTION_STARTFRAME] + l*curframe;
+            t->picnum += frameOffset + apScript[scrofs_action + ACTION_STARTFRAME] + viewtype*curframe;
 #else
-            t->picnum += frameOffset + startframe + l*curframe;
+            t->picnum += frameOffset + startframe + viewtype*curframe;
 #endif
             // XXX: t->picnum can be out-of-bounds by bad user code.
 
-            if (l > 0)
+            if (viewtype > 0)
                 while (tilesiz[t->picnum].x == 0 && t->picnum > 0)
                     t->picnum -= l;       //Hack, for actors
 
@@ -5862,8 +5935,8 @@ static void G_CompileScripts(void)
     int32_t psm = pathsearchmode;
 
     label     = (char *)&sprite[0];     // V8: 16384*44/64 = 11264  V7: 4096*44/64 = 2816
-    labelcode = (int32_t *)&sector[0]; // V8: 4096*40/4 = 40960    V7: 1024*40/4 = 10240
-    labeltype = (int32_t *)&wall[0];   // V8: 16384*32/4 = 131072  V7: 8192*32/4 = 65536
+    labelcode = (int32_t *)&sector[0];  // V8: 4096*40/4 = 40960    V7: 1024*40/4 = 10240
+    labeltype = (uint8_t *)&wall[0];    // V8: 16384*32 = 524288    V7: 8192*32/4 = 262144
 #endif
 
     if (g_scriptNamePtr != NULL)
@@ -5886,11 +5959,11 @@ static void G_CompileScripts(void)
 
     auto newlabel     = (char *)Xmalloc(g_labelCnt << 6);
     auto newlabelcode = (int32_t *)Xmalloc(g_labelCnt * sizeof(int32_t));
-    auto newlabeltype = (int32_t *)Xmalloc(g_labelCnt * sizeof(int32_t));
+    auto newlabeltype = (uint8_t *)Xmalloc(g_labelCnt * sizeof(uint8_t));
 
     Bmemcpy(newlabel, label, g_labelCnt * 64);
     Bmemcpy(newlabelcode, labelcode, g_labelCnt * sizeof(int32_t));
-    Bmemcpy(newlabeltype, labeltype, g_labelCnt * sizeof(int32_t));
+    Bmemcpy(newlabeltype, labeltype, g_labelCnt * sizeof(uint8_t));
 
     label     = newlabel;
     labelcode = newlabelcode;
@@ -5967,6 +6040,17 @@ static void A_InitEnemyFlags(void)
 
     for (bssize_t i=ARRAY_SIZE(GreenSlimeFoodEnemies)-1; i>=0; i--)
         SETFLAG(GreenSlimeFoodEnemies[i], SFLAG_GREENSLIMEFOOD);
+
+    if (WORLDTOUR)
+    {
+        SETFLAG(FIREFLY, SFLAG_HARDCODED_BADGUY);
+        SETFLAG(BOSS5, SFLAG_NODAMAGEPUSH|SFLAG_HARDCODED_BADGUY);
+        SETFLAG(BOSS1STAYPUT, SFLAG_NODAMAGEPUSH|SFLAG_HARDCODED_BADGUY);
+        SETFLAG(BOSS2STAYPUT, SFLAG_NODAMAGEPUSH|SFLAG_HARDCODED_BADGUY);
+        SETFLAG(BOSS3STAYPUT, SFLAG_NODAMAGEPUSH|SFLAG_HARDCODED_BADGUY);
+        SETFLAG(BOSS4STAYPUT, SFLAG_NODAMAGEPUSH|SFLAG_HARDCODED_BADGUY);
+        SETFLAG(BOSS5STAYPUT, SFLAG_NODAMAGEPUSH|SFLAG_HARDCODED_BADGUY);
+    }
 #endif
 }
 #undef SETFLAG
@@ -6323,27 +6407,6 @@ void G_MaybeAllocPlayer(int32_t pnum)
     g_player_ps[pnum] = g_player[pnum].ps;
     g_player[pnum].ps->wa.idx = pnum;
 #endif
-}
-
-
-int G_FPSLimit(void)
-{
-    if (!r_maxfps)
-        return true;
-
-    g_frameDelay = calcFrameDelay(r_maxfps, r_maxfpsoffset);
-
-    uint64_t const  frameTicks     = timerGetPerformanceCounter();
-    static uint64_t nextFrameTicks = frameTicks + g_frameDelay;
-
-    if (frameTicks >= nextFrameTicks)
-    {
-        while (frameTicks >= nextFrameTicks)
-            nextFrameTicks += g_frameDelay;
-        return true;
-    }
-
-    return false;
 }
 
 // TODO: reorder (net)actor_t to eliminate slop and update assertion
@@ -6749,18 +6812,12 @@ int app_main(int argc, char const * const * argv)
             ud.setup.bpp  = bpp;
         }
 
-        g_frameDelay = calcFrameDelay(r_maxfps, r_maxfpsoffset);
         videoSetPalette(ud.brightness>>2, myplayer.palette, 0);
         S_SoundStartup();
         S_MusicStartup();
     }
 
-    // check if the minifont will support lowercase letters (3136-3161)
-    // there is room for them in tiles012.art between "[\]^_." and "{|}~"
-    minitext_lowercase = 1;
-
-    for (int i = MINIFONT + ('a'-'!'); minitext_lowercase && i < MINIFONT + ('z'-'!') + 1; ++i)
-        minitext_lowercase &= (int)tileLoad(i);
+    G_InitText();
 
     if (g_networkMode != NET_DEDICATED_SERVER)
     {
@@ -6971,7 +7028,7 @@ MAIN_LOOP_RESTART:
         {
             idle();
         }
-        else if (G_FPSLimit() || g_saveRequested)
+        else if (engineFPSLimit() || g_saveRequested)
         {
             if (!g_saveRequested)
             {

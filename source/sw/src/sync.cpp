@@ -63,7 +63,7 @@ void initsynccrc(void)
 uint8_t
 PlayerSync(void)
 {
-    short i, j;
+    short i;
     unsigned short crc = 0;
     PLAYERp pp;
 
@@ -73,7 +73,7 @@ PlayerSync(void)
         updatecrc(crc, pp->posx & 255);
         updatecrc(crc, pp->posy & 255);
         updatecrc(crc, pp->posz & 255);
-        updatecrc(crc, pp->pang & 255);
+        updatecrc(crc, fix16_to_int(pp->q16ang) & 255);
     }
 
     return (uint8_t) crc & 255;
@@ -82,7 +82,7 @@ PlayerSync(void)
 uint8_t
 PlayerSync2(void)
 {
-    short i, j;
+    short i;
     unsigned short crc = 0;
     PLAYERp pp;
 
@@ -90,7 +90,7 @@ PlayerSync2(void)
     {
         pp = Player + i;
 
-        updatecrc(crc, pp->horiz & 255);
+        updatecrc(crc, fix16_to_int(pp->q16horiz) & 255);
         updatecrc(crc, User[pp->PlayerSprite]->Health & 255);
         updatecrc(crc, pp->bcnt & 255);
     }
@@ -128,7 +128,6 @@ EnemySync(void)
     unsigned short crc = 0;
     short j, nextj;
     SPRITEp spr;
-    extern char DemoTmpName[];
 
     TRAVERSE_SPRITE_STAT(headspritestat[STAT_ENEMY], j, nextj)
     {
@@ -140,6 +139,7 @@ EnemySync(void)
     }
 
 #if 0
+    extern char DemoTmpName[];
     //DSPRINTF(ds, "Demo Tmp Name %s", DemoTmpName);
     MONO_PRINT(ds);
 
@@ -312,7 +312,6 @@ getsyncstat(void)
     PLAYERp pp = Player + myconnectindex;
     unsigned int val;
     static unsigned int count;
-    extern int syncvaltail, syncvaltottail;
 
     if (!CommEnabled)
         return;
@@ -341,7 +340,7 @@ getsyncstat(void)
 void
 SyncStatMessage(void)
 {
-    int i, j, count = 0;
+    int i, j;
     static unsigned int MoveCount = 0;
     extern unsigned int MoveThingsCount;
 
@@ -422,7 +421,7 @@ void
 GetSyncInfoFromPacket(uint8_t *packbuf, int packbufleng, int *j, int otherconnectindex)
 {
     int sb, i;
-    extern int syncvaltail, syncvaltottail;
+    extern int syncvaltottail;
     PLAYERp ppo = &Player[otherconnectindex];
     SWBOOL found = FALSE;
 
@@ -550,7 +549,7 @@ getsyncbyte()
         {
         pp = Player + i;
         u = User[pp->SpriteP - sprite];
-        ch ^= (pp->posx ^ pp->posy ^ pp->posz ^ pp->pang ^ pp->horiz ^ u->Health);
+        ch ^= (pp->posx ^ pp->posy ^ pp->posz ^ fix16_to_int(pp->q16ang) ^ fix16_to_int(pp->q16horiz) ^ u->Health);
         }
 
     for (j = headspritestat[STAT_ENEMY]; j >= 0; j = nextspritestat[j])

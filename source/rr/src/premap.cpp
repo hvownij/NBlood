@@ -132,7 +132,7 @@ static void G_CacheSpriteNum(int32_t i)
         break;
     case DOGRUN__STATICRR:
         for (j = DOGATTACK; j <= DOGATTACK + 35; j++) tloadtile(j,1);
-        for (j = DOGRUN; j <= DOGRUN + 80; j++) tloadtile(j,1);
+        for (j = DOGRUN; j <= DOGRUN + 121; j++) tloadtile(j,1);
         maxc = 0;
         break;
     case RABBIT__STATICRR:
@@ -163,8 +163,7 @@ static void G_CacheSpriteNum(int32_t i)
         break;
     case CHEERB__STATICRR:
         if (!RRRA) break;
-        for (j = CHEERB; j <= CHEERB + 83; j++) tloadtile(j,1);
-        for (j = CHEERB + 157; j <= CHEERB + 157 + 83; j++) tloadtile(j,1);
+        for (j = CHEERB; j <= CHEERB + 157 + 83; j++) tloadtile(j,1);
         maxc = 0;
         break;
     case MAMA__STATICRR:
@@ -201,7 +200,7 @@ static void G_CacheSpriteNum(int32_t i)
         break;
     case PIG__STATICRR:
     case PIGSTAYPUT__STATICRR:
-        maxc = 68;
+        maxc = 69;
         break;
     case TORNADO__STATICRR:
         maxc = 7;
@@ -484,7 +483,7 @@ static void G_DoLoadScreen(const char *statustext, int32_t percent)
 
         videoClearScreen(0);
         
-        int const loadScreenTile = VM_OnEventWithReturn(EVENT_GETLOADTILE, g_player[screenpeek].ps->i, screenpeek, LOADSCREEN);
+        int const loadScreenTile = VM_OnEventWithReturn(EVENT_GETLOADTILE, g_player[screenpeek].ps->i, screenpeek, DEER ? 7040 : LOADSCREEN);
 
         rotatesprite_fs(320<<15,200<<15,65536L,0,loadScreenTile,0,0,2+8+64+BGSTRETCH);
 
@@ -1310,19 +1309,22 @@ static void prelevel(char g)
         g_mamaSpawnCnt = 15;
         g_banjoSong = 0;
         g_RAendLevel = 0;
-        for (bssize_t TRAVERSE_CONNECT(playerNum))
+        if (!DEER)
         {
-            DukePlayer_t *ps = g_player[playerNum].ps;
-            ps->sea_sick_stat = 0;
-            if (ud.level_number == 4 && ud.volume_number == 1)
-                ps->inv_amount[GET_STEROIDS] = 0;
+            for (bssize_t TRAVERSE_CONNECT(playerNum))
+            {
+                DukePlayer_t *ps = g_player[playerNum].ps;
+                ps->sea_sick_stat = 0;
+                if (ud.level_number == 4 && ud.volume_number == 1)
+                    ps->inv_amount[GET_STEROIDS] = 0;
+            }
+            if (ud.level_number == 3 && ud.volume_number == 0)
+                g_mamaSpawnCnt = 5;
+            else if (ud.level_number == 2 && ud.volume_number == 1)
+                g_mamaSpawnCnt = 10;
+            else if (ud.level_number == 6 && ud.volume_number == 1)
+                g_mamaSpawnCnt = 15;
         }
-        if (ud.level_number == 3 && ud.volume_number == 0)
-            g_mamaSpawnCnt = 5;
-        else if (ud.level_number == 2 && ud.volume_number == 1)
-            g_mamaSpawnCnt = 10;
-        else if (ud.level_number == 6 && ud.volume_number == 1)
-            g_mamaSpawnCnt = 15;
     }
 
     Bmemset(g_spriteExtra, 0, sizeof(g_spriteExtra));
@@ -1380,6 +1382,7 @@ static void prelevel(char g)
 
     int missedCloudSectors = 0;
 
+    if (!DEER)
     for (bssize_t i=0; i<numsectors; i++)
     {
         if (RR && sector[i].ceilingpicnum == RRTILE2577)
@@ -1514,6 +1517,7 @@ static void prelevel(char g)
         OSD_Printf(OSDTEXT_RED "Map warning: have %d unhandled CLOUDYSKIES ceilings.\n", missedCloudSectors);
 
     // NOTE: must be safe loop because callbacks could delete sprites.
+    if (!DEER)
     for (bssize_t nextSprite, SPRITES_OF_STAT_SAFE(STAT_DEFAULT, i, nextSprite))
     {
         //A_LoadActor(i);
@@ -1604,7 +1608,7 @@ static void prelevel(char g)
             //    break;
             }
     }
-    if (RR)
+    if (RR && !DEER)
     {
         for (bssize_t i = 0; i < MAXSPRITES; i++)
         {
@@ -1641,10 +1645,11 @@ static void prelevel(char g)
 
     for (size_t i = 0; i < MAXSPRITES; i++)
     {
-        if (sprite[i].statnum < MAXSTATUS && (PN(i) != SECTOREFFECTOR || SLT(i) != SE_14_SUBWAY_CAR))
+        if (sprite[i].statnum < MAXSTATUS && (DEER || PN(i) != SECTOREFFECTOR || SLT(i) != SE_14_SUBWAY_CAR))
             A_Spawn(-1, i);
     }
 
+    if (!DEER)
     for (size_t i = 0; i < MAXSPRITES; i++)
     {
         if (sprite[i].statnum < MAXSTATUS && PN(i) == SECTOREFFECTOR && SLT(i) == SE_14_SUBWAY_CAR)
@@ -1660,6 +1665,7 @@ static void prelevel(char g)
 
     //G_SetupRotfixedSprites();
 
+    if (!DEER)
     for (bssize_t i=headspritestat[STAT_DEFAULT]; i>=0; i=nextspritestat[i])
     {
         if (PN(i) <= 0)  // oob safety for switch below
@@ -1697,6 +1703,7 @@ static void prelevel(char g)
     }
 
     // initially 'on' SE 12 light (*)
+    if (!DEER)
     for (bssize_t j=headspritestat[STAT_EFFECTOR]; j>=0; j=nextspritestat[j])
     {
         uint16_t const tag = sprite[j].hitag;
@@ -1713,7 +1720,7 @@ static void prelevel(char g)
     {
         walltype * const pWall = &wall[i];
 
-        if (pWall->overpicnum == MIRROR && (pWall->cstat&32) != 0)
+        if (!DEER && pWall->overpicnum == MIRROR && (pWall->cstat&32) != 0)
         {
             int const nextSectnum = pWall->nextsector;
 
@@ -1741,6 +1748,12 @@ static void prelevel(char g)
 
         animwall[g_animWallCnt].tag = 0;
         animwall[g_animWallCnt].wallnum = 0;
+
+        if (DEER)
+        {
+            pWall->extra = -1;
+            continue;
+        }
 
         int const switchPic = G_GetForcefieldPicnum(i);
 
@@ -1898,6 +1911,9 @@ static void prelevel(char g)
     }
 
     G_SetupGlobalPsky();
+
+    if (DEER)
+        sub_52BA8();
 }
 
 

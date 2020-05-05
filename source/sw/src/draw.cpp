@@ -97,11 +97,9 @@ GetRotation(short tSpriteNum, int viewx, int viewy)
     static short RotTable8[] = {0, 7, 6, 5, 4, 3, 2, 1};
     static short RotTable5[] = {0, 1, 2, 3, 4, 3, 2, 1};
     short rotation;
-    extern short screenpeek;
 
     tspriteptr_t tsp = &tsprite[tSpriteNum];
     USERp tu = User[tsp->owner];
-    PLAYERp pp = Player + screenpeek;
     short angle2;
 
     if (tu->RotNum == 0)
@@ -236,7 +234,6 @@ DoShadowFindGroundPoint(tspriteptr_t sp)
     int ceilhit, florhit;
     int hiz, loz = u->loz;
     short save_cstat, bak_cstat;
-    SWBOOL found = FALSE;
 
     // recursive routine to find the ground - either sector or floor sprite
     // skips over enemy and other types of sprites
@@ -659,8 +656,8 @@ void DoStarView(tspriteptr_t tsp, USERp tu, int viewz)
 void
 analyzesprites(int viewx, int viewy, int viewz, SWBOOL mirror)
 {
-    int tSpriteNum, j, k;
-    short SpriteNum, pnum;
+    int tSpriteNum;
+    short SpriteNum;
     int smr4, smr2;
     USERp tu;
     static int ang = 0;
@@ -1031,6 +1028,8 @@ post_analyzesprites(void)
 }
 #endif
 
+static ClockTicks mapzoomclock;
+
 void
 ResizeView(PLAYERp pp)
 {
@@ -1039,15 +1038,13 @@ ResizeView(PLAYERp pp)
 
     if (dimensionmode == 2 || dimensionmode == 5 || dimensionmode == 6)
     {
+        int32_t timepassed = (int32_t)(totalclock - mapzoomclock);
+        mapzoomclock += timepassed;
         if (PKEY_PRESSED(KEYSC_DASH)||PKEY_PRESSED(KEYSC_GMINUS))
-        {
-            if ((zoom -= (zoom >> 4)) < 48) zoom = 48;
-        }
+            zoom = max<int32_t>(zoom - mulscale7(timepassed * synctics, zoom), 48);
 
         if (PKEY_PRESSED(KEYSC_EQUAL)||PKEY_PRESSED(KEYSC_GPLUS))
-        {
-            if ((zoom += (zoom >> 4)) > 4096) zoom = 4096;
-        }
+            zoom = min<int32_t>(zoom + mulscale7(timepassed * synctics, zoom), 4096);
 
         if (KEY_PRESSED(KEYSC_ESC))
         {
@@ -1095,7 +1092,7 @@ ViewOutsidePlayerRecurse(PLAYERp pp, int32_t* vx, int32_t* vy, int32_t* vz, int1
     *vz = pp->posz;
     *vsectnum = pp->cursectnum;
 
-    *ang = pp->pang + pp->view_outside_dang;
+    *ang = fix16_to_int(pp->q16ang) + pp->view_outside_dang;
 
     nx = sintable[NORM_ANGLE(*ang + 512 + 1024)] << 11;
     ny = sintable[NORM_ANGLE(*ang + 1024)] << 11;
@@ -1143,19 +1140,19 @@ ViewOutsidePlayerRecurse(PLAYERp pp, int32_t* vx, int32_t* vy, int32_t* vz, int1
 
 
 void
-BackView(int *nx, int *ny, int *nz, short *vsect, short *nang, short horiz)
+BackView(int *nx, int *ny, int *nz, short *vsect, fix16_t *nq16ang, short horiz)
 {
     vec3_t n = { *nx, *ny, *nz };
     SPRITEp sp;
     hitdata_t hitinfo;
-    int i, vx, vy, vz, hx, hy, hz;
+    int i, vx, vy, vz, hx, hy;
     short bakcstat, daang;
     PLAYERp pp = &Player[screenpeek];
     short ang;
 
     ASSERT(*vsect >= 0 && *vsect < MAXSECTORS);
 
-    ang = *nang + pp->view_outside_dang;
+    ang = fix16_to_int(*nq16ang) + pp->view_outside_dang;
 
     // Calculate the vector (nx,ny,nz) to shoot backwards
     vx = (sintable[NORM_ANGLE(ang + 1536)] >> 3);
@@ -1217,7 +1214,7 @@ BackView(int *nx, int *ny, int *nz, short *vsect, short *nang, short horiz)
                 flag_backup = hsp->cstat;
                 RESET(hsp->cstat, CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_BLOCK_HITSCAN);
                 ASSERT(*vsect >= 0 && *vsect < MAXSECTORS);
-                BackView(nx, ny, nz, vsect, nang, horiz);
+                BackView(nx, ny, nz, vsect, nq16ang, horiz);
                 hsp->cstat = flag_backup;
                 return;
             }
@@ -1258,21 +1255,21 @@ BackView(int *nx, int *ny, int *nz, short *vsect, short *nang, short horiz)
     // Make sure vsect is correct
     updatesectorz(*nx, *ny, *nz, vsect);
 
-    *nang = ang;
+    *nq16ang = fix16_from_int(ang);
 }
 
 void
-CircleCamera(int *nx, int *ny, int *nz, short *vsect, short *nang, short horiz)
+CircleCamera(int *nx, int *ny, int *nz, short *vsect, int *nq16ang, short horiz)
 {
     vec3_t n = { *nx, *ny, *nz };
     SPRITEp sp;
     hitdata_t hitinfo;
-    int i, vx, vy, vz, hx, hy, hz;
+    int i, vx, vy, vz, hx, hy;
     short bakcstat, daang;
     PLAYERp pp = &Player[screenpeek];
     short ang;
 
-    ang = *nang + pp->circle_camera_ang;
+    ang = fix16_to_int(*nq16ang) + pp->circle_camera_ang;
 
     // Calculate the vector (nx,ny,nz) to shoot backwards
     vx = (sintable[NORM_ANGLE(ang + 1536)] >> 4);
@@ -1338,7 +1335,7 @@ CircleCamera(int *nx, int *ny, int *nz, short *vsect, short *nang, short horiz)
                 flag_backup = hsp->cstat;
                 RESET(hsp->cstat, CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_BLOCK_HITSCAN);
 
-                CircleCamera(nx, ny, nz, vsect, nang, horiz);
+                CircleCamera(nx, ny, nz, vsect, nq16ang, horiz);
                 hsp->cstat = flag_backup;
                 return;
             }
@@ -1367,7 +1364,7 @@ CircleCamera(int *nx, int *ny, int *nz, short *vsect, short *nang, short horiz)
     // Make sure vsect is correct
     updatesectorz(*nx, *ny, *nz, vsect);
 
-    *nang = ang;
+    *nq16ang = fix16_from_int(ang);
 }
 
 void PrintLocationInfo(PLAYERp pp)
@@ -1405,7 +1402,7 @@ void PrintLocationInfo(PLAYERp pp)
             sprintf(buffer, "POSZ:%d", pp->posz);
             printext256(x, y, 1, -1, buffer, 1);
             y += Y_STEP;
-            sprintf(buffer, "ANG:%d", (int32_t) pp->pang);
+            sprintf(buffer, "ANG:%d", (int32_t) fix16_to_int(pp->q16ang));
             printext256(x, y, 1, -1, buffer, 1);
             y += Y_STEP;
         }
@@ -1681,9 +1678,9 @@ void ScreenCaptureKeys(void)
 void DrawCheckKeys(PLAYERp pp)
 {
     extern SWBOOL ResCheat;
-    extern SWBOOL PauseKeySet;
 
     /* JonoF: Who really needs this now?
+    extern SWBOOL PauseKeySet;
     if (KEY_PRESSED(KEYSC_F5) && !(KEY_PRESSED(KEYSC_RSHIFT) || KEY_PRESSED(KEYSC_LSHIFT) || KEY_PRESSED(KEYSC_ALT) || KEY_PRESSED(KEYSC_RALT)) && !PauseKeySet)
         {
         KEY_PRESSED(KEYSC_F5) = 0;
@@ -1706,7 +1703,7 @@ void DrawCheckKeys(PLAYERp pp)
 }
 
 #if 0
-void DrawMessageInput(PLAYERp pp)
+void DrawMessageInput(void)
 {
     short w,h;
     static SWBOOL cur_show;
@@ -1735,7 +1732,7 @@ void DrawMessageInput(PLAYERp pp)
     }
 }
 #else
-void DrawMessageInput(PLAYERp pp)
+void DrawMessageInput(void)
 {
     short w,h;
     static SWBOOL cur_show;
@@ -1751,19 +1748,19 @@ void DrawMessageInput(PLAYERp pp)
         cur_show ^= 1;
         if (cur_show)
         {
-            minigametext(TEXT_XCENTER(w), MESSAGE_LINE, MessageInputString,0,ROTATE_SPRITE_SCREEN_CLIP);
+            minigametext(TEXT_XCENTER(w), MESSAGE_LINE, MessageInputString,ROTATE_SPRITE_SCREEN_CLIP);
             rotatesprite((TEXT_XCENTER(w)+w+2)<<16,(MESSAGE_LINE+1)<<16,20000,0,COINCURSOR+(((int32_t) totalclock>>3)%7),c,0,ROTATE_SPRITE_SCREEN_CLIP,0,0,xdim-1,ydim-1);
         }
         else
         {
-            minigametext(TEXT_XCENTER(w), MESSAGE_LINE, MessageInputString,0,ROTATE_SPRITE_SCREEN_CLIP);
+            minigametext(TEXT_XCENTER(w), MESSAGE_LINE, MessageInputString,ROTATE_SPRITE_SCREEN_CLIP);
             rotatesprite((TEXT_XCENTER(w)+w+2)<<16,(MESSAGE_LINE+1)<<16,20000,0,COINCURSOR+(((int32_t) totalclock>>3)%7),c,0,ROTATE_SPRITE_SCREEN_CLIP,0,0,xdim-1,ydim-1);
         }
     }
 }
 #endif
 
-void DrawConInput(PLAYERp pp)
+void DrawConInput(void)
 {
 #define PANELINPUTX 30
 #define PANELINPUTY 100
@@ -1796,7 +1793,6 @@ void DrawConInput(PLAYERp pp)
 
 void DrawCrosshair(PLAYERp pp)
 {
-    extern int CrosshairX, CrosshairY;
     extern SWBOOL DemoMode,CameraTestMode;
 
     if (!gs.Crosshair)
@@ -1832,7 +1828,7 @@ void DrawCrosshair(PLAYERp pp)
             vec2_t dxy = { hp->x - pp->posx, hp->y - pp->posy };
             int dz = ((hp->z - (SPRITE_SIZE_Z(hit_sprite)/2)) - pp->posz) >> 4;
 
-            rotatepoint(zero, dxy, (-pp->pang)&2047, &dxy);
+            rotatepoint(zero, dxy, (-fix16_to_int(pp->q16ang))&2047, &dxy);
 
             if (dxy.x == 0) return;
 
@@ -1882,7 +1878,7 @@ void DrawCrosshair(PLAYERp pp)
 
 }
 
-void CameraView(PLAYERp pp, int *tx, int *ty, int *tz, short *tsectnum, short *tang, int *thoriz)
+void CameraView(PLAYERp pp, int *tx, int *ty, int *tz, short *tsectnum, fix16_t *tq16ang, fix16_t *tq16horiz)
 {
     int i,nexti;
     short ang;
@@ -1923,7 +1919,7 @@ void CameraView(PLAYERp pp, int *tx, int *ty, int *tz, short *tsectnum, short *t
                 {
                 case 1:
                     pp->last_camera_sp = sp;
-                    CircleCamera(tx, ty, tz, tsectnum, tang, 100);
+                    CircleCamera(tx, ty, tz, tsectnum, tq16ang, 100);
                     found_camera = TRUE;
                     break;
 
@@ -1949,14 +1945,14 @@ void CameraView(PLAYERp pp, int *tx, int *ty, int *tz, short *tsectnum, short *t
                         zvect = 0;
 
                     // new horiz to player
-                    *thoriz = 100 - (zvect/256);
-                    *thoriz = max(*thoriz, PLAYER_HORIZ_MIN);
-                    *thoriz = min(*thoriz, PLAYER_HORIZ_MAX);
+                    *tq16horiz = fix16_from_int(100 - (zvect/256));
+                    *tq16horiz = fix16_max(*tq16horiz, fix16_from_int(PLAYER_HORIZ_MIN));
+                    *tq16horiz = fix16_min(*tq16horiz, fix16_from_int(PLAYER_HORIZ_MAX));
 
-                    //DSPRINTF(ds,"xvect %d,yvect %d,zvect %d,thoriz %d",xvect,yvect,zvect,*thoriz);
+                    //DSPRINTF(ds,"xvect %d,yvect %d,zvect %d,tq16horiz %d",xvect,yvect,zvect,*tq16horiz);
                     MONO_PRINT(ds);
 
-                    *tang = ang;
+                    *tq16ang = fix16_from_int(ang);
                     *tx = sp->x;
                     *ty = sp->y;
                     *tz = sp->z;
@@ -2015,8 +2011,6 @@ void
 PostDraw(void)
 {
     short i, nexti;
-    short sectnum,statnum;
-    SPRITEp sp;
 
     TRAVERSE_SPRITE_STAT(headspritestat[STAT_FLOOR_SLOPE_DONT_DRAW], i, nexti)
     {
@@ -2032,9 +2026,9 @@ PostDraw(void)
         }
 
 #if DEBUG
-        sp = &sprite[i];
-        statnum = sp->statnum;
-        sectnum = sp->sectnum;
+        SPRITEp sp = &sprite[i];
+        short statnum = sp->statnum;
+        short sectnum = sp->sectnum;
         memset(sp, 0xCC, sizeof(SPRITE));
         sp->statnum = statnum;
         sp->sectnum = sectnum;
@@ -2114,16 +2108,9 @@ void PreDrawStackedWater(void)
 {
     short si,snexti;
     short i,nexti;
-    SPRITEp sp,np;
+    SPRITEp sp;
     USERp u,nu;
     short New;
-    int smr4,smr2;
-    int x,y,z;
-    short ang;
-    PLAYERp pp = Player + screenpeek;
-
-    smr4 = smoothratio + (((int) MoveSkip4) << 16);
-    smr2 = smoothratio + (((int) MoveSkip2) << 16);
 
     TRAVERSE_SPRITE_STAT(headspritestat[STAT_CEILING_FLOOR_PIC_OVERRIDE], si, snexti)
     {
@@ -2147,8 +2134,6 @@ void PreDrawStackedWater(void)
                 New = ConnectCopySprite((uspritetype const *)sp);
                 if (New >= 0)
                 {
-                    np = &sprite[New];
-
                     // spawn a user
                     User[New] = nu = (USERp)CallocMem(sizeof(USER), 1);
                     ASSERT(nu != NULL);
@@ -2182,7 +2167,7 @@ void PreDrawStackedWater(void)
 }
 
 
-void FAF_DrawRooms(int x, int y, int z, short ang, int horiz, short sectnum)
+void FAF_DrawRooms(int x, int y, int z, fix16_t q16ang, fix16_t q16horiz, short sectnum)
 {
     short i,nexti;
 
@@ -2209,7 +2194,7 @@ void FAF_DrawRooms(int x, int y, int z, short ang, int horiz, short sectnum)
         }
     }
 
-    drawrooms(x,y,z,ang,horiz,sectnum);
+    renderDrawRoomsQ16(x,y,z,q16ang,q16horiz,sectnum);
 
     TRAVERSE_SPRITE_STAT(headspritestat[STAT_CEILING_FLOOR_PIC_OVERRIDE], i, nexti)
     {
@@ -2243,10 +2228,10 @@ void
 drawscreen(PLAYERp pp)
 {
     extern SWBOOL DemoMode,CameraTestMode;
-    int tx, ty, tz,thoriz,pp_siz;
-    short tang,tsectnum;
+    int tx, ty, tz;
+    fix16_t tq16horiz, tq16ang;
+    short tsectnum;
     short i,j;
-    int tiltlock;
     int bob_amt = 0;
     int quake_z, quake_x, quake_y;
     short quake_ang;
@@ -2328,8 +2313,17 @@ drawscreen(PLAYERp pp)
     tx = camerapp->oposx + mulscale16(camerapp->posx - camerapp->oposx, smoothratio);
     ty = camerapp->oposy + mulscale16(camerapp->posy - camerapp->oposy, smoothratio);
     tz = camerapp->oposz + mulscale16(camerapp->posz - camerapp->oposz, smoothratio);
-    tang = camerapp->oang + mulscale16(((camerapp->pang + 1024 - camerapp->oang) & 2047) - 1024, smoothratio);
-    thoriz = camerapp->ohoriz + mulscale16(camerapp->horiz - camerapp->ohoriz, smoothratio);
+    if (PedanticMode || pp->sop_control ||
+        pp == Player+myconnectindex && TEST(pp->Flags, PF_DEAD))
+    {
+        tq16ang = camerapp->oq16ang + mulscale16(((camerapp->q16ang + fix16_from_int(1024) - camerapp->oq16ang) & 0x7FFFFFF) - fix16_from_int(1024), smoothratio);
+        tq16horiz = camerapp->oq16horiz + mulscale16(camerapp->q16horiz - camerapp->oq16horiz, smoothratio);
+    }
+    else
+    {
+        tq16ang = pp->camq16ang;
+        tq16horiz = pp->camq16horiz;
+    }
     tsectnum = camerapp->cursectnum;
 
     //ASSERT(tsectnum >= 0 && tsectnum <= MAXSECTORS);
@@ -2360,54 +2354,53 @@ drawscreen(PLAYERp pp)
     // with "last valid" code this should never happen
     // ASSERT(tsectnum >= 0 && tsectnum <= MAXSECTORS);
 
+    if (pp->sop_riding || pp->sop_control)
+    {
+        if (pp->sop_control && !InterpolateSectObj)
+        {
+            tx = pp->posx;
+            ty = pp->posy;
+            tz = pp->posz;
+            tq16ang = pp->q16ang;
+        }
+        tsectnum = pp->cursectnum;
+        updatesectorz(tx, ty, tz, &tsectnum);
+    }
+
     pp->six = tx;
     pp->siy = ty;
     pp->siz = tz - pp->posz;
-    pp_siz = tz;
-    pp->siang = tang;
-
-    if (pp->sop_riding || pp->sop_control)
-    {
-        tx = pp->posx;
-        ty = pp->posy;
-        tz = pp->posz;
-        tang = pp->pang;
-        tsectnum = pp->cursectnum;
-        updatesectorz(tx, ty, tz, &tsectnum);
-
-        pp->six = tx;
-        pp->siy = ty;
-        pp->siz = tz - pp->posz;
-        pp->siang = tang;
-    }
+    pp->siang = fix16_to_int(tq16ang);
 
     QuakeViewChange(camerapp, &quake_z, &quake_x, &quake_y, &quake_ang);
     VisViewChange(camerapp, &g_visibility);
     tz = tz + quake_z;
     tx = tx + quake_x;
     ty = ty + quake_y;
-    //thoriz = thoriz + quake_x;
-    tang = NORM_ANGLE(tang + quake_ang);
+    //tq16horiz = tq16horiz + fix16_from_int(quake_x);
+    tq16ang = fix16_from_int(NORM_ANGLE(fix16_to_int(tq16ang) + quake_ang));
 
     if (pp->sop_remote)
     {
         if (TEST_BOOL1(pp->remote_sprite))
-            tang = pp->remote_sprite->ang;
+            tq16ang = fix16_from_int(pp->remote_sprite->ang);
         else
-            tang = getangle(pp->sop_remote->xmid - tx, pp->sop_remote->ymid - ty);
+            tq16ang = fix16_from_int(getangle(pp->sop_remote->xmid - tx, pp->sop_remote->ymid - ty));
     }
 
     //if (TEST(camerapp->Flags, PF_VIEW_FROM_OUTSIDE))
     if (TEST(pp->Flags, PF_VIEW_FROM_OUTSIDE))
     {
-        BackView(&tx, &ty, &tz, &tsectnum, &tang, thoriz);
+        BackView(&tx, &ty, &tz, &tsectnum, &tq16ang, fix16_to_int(tq16horiz));
     }
     else
     {
         bob_amt = camerapp->bob_amt;
 
         if (DemoMode || CameraTestMode)
-            CameraView(camerapp, &tx, &ty, &tz, &tsectnum, &tang, &thoriz);
+        {
+            CameraView(camerapp, &tx, &ty, &tz, &tsectnum, &tq16ang, &tq16horiz);
+        }
     }
 
     if (!TEST(pp->Flags, PF_VIEW_FROM_CAMERA|PF_VIEW_FROM_OUTSIDE))
@@ -2416,10 +2409,10 @@ drawscreen(PLAYERp pp)
         tz += camerapp->bob_z;
 
         // recoil only when not in camera
-        //thoriz = thoriz + camerapp->recoil_horizoff;
-        thoriz = thoriz + pp->recoil_horizoff;
-        thoriz = max(thoriz, PLAYER_HORIZ_MIN);
-        thoriz = min(thoriz, PLAYER_HORIZ_MAX);
+        //tq16horiz = tq16horiz + fix16_from_int(camerapp->recoil_horizoff);
+        tq16horiz = tq16horiz + fix16_from_int(pp->recoil_horizoff);
+        tq16horiz = fix16_max(tq16horiz, fix16_from_int(PLAYER_HORIZ_MIN));
+        tq16horiz = fix16_min(tq16horiz, fix16_from_int(PLAYER_HORIZ_MAX));
     }
 
     if (r_usenewaspect)
@@ -2432,21 +2425,20 @@ drawscreen(PLAYERp pp)
         videoClearViewableArea(255L);
 
     OverlapDraw = TRUE;
-    DrawOverlapRoom(tx, ty, tz, tang, thoriz, tsectnum);
+    DrawOverlapRoom(tx, ty, tz, tq16ang, tq16horiz, tsectnum);
     OverlapDraw = FALSE;
 
     if (dimensionmode != 6 && !ScreenSavePic)
     {
         // TEST this! Changed to camerapp
-        //JS_DrawMirrors(camerapp, tx, ty, tz, tang, thoriz);
-        JS_DrawMirrors(pp, tx, ty, tz, tang, thoriz);
+        //JS_DrawMirrors(camerapp, tx, ty, tz, tq16ang, tq16horiz);
+        JS_DrawMirrors(pp, tx, ty, tz, tq16ang, tq16horiz);
     }
 
+    // TODO: This call is redundant if the tiled overhead map is shown, but the
+    // HUD elements should be properly outputted with hardware rendering first.
     if (!FAF_DebugView)
-    {
-        FAF_DrawRooms(tx, ty, tz, tang, thoriz, tsectnum);
-        PicInView(FAF_MIRROR_PIC, FALSE);
-    }
+        FAF_DrawRooms(tx, ty, tz, tq16ang, tq16horiz, tsectnum);
 
     analyzesprites(tx, ty, tz, FALSE);
     post_analyzesprites();
@@ -2519,11 +2511,11 @@ drawscreen(PLAYERp pp)
         if (dimensionmode == 6)
         {
             videoClearViewableArea(0L);
-            renderDrawMapView(tx, ty, zoom, tang);
+            renderDrawMapView(tx, ty, zoom, fix16_to_int(tq16ang));
         }
 
         // Draw the line map on top of texture 2d map or just stand alone
-        drawoverheadmap(tx, ty, zoom, tang);
+        drawoverheadmap(tx, ty, zoom, fix16_to_int(tq16ang));
     }
 
     for (j = 0; j < MAXSPRITES; j++)
@@ -2561,10 +2553,10 @@ drawscreen(PLAYERp pp)
 
     if (ConInputMode)
     {
-        DrawConInput(pp);   // Console panel input mode
+        DrawConInput();   // Console panel input mode
     }
     else
-        DrawMessageInput(pp);   // This is only used for non-multiplayer input now
+        DrawMessageInput();   // This is only used for non-multiplayer input now
 
     DrawCompass(pp);
     UpdateMiniBar(pp);
@@ -2621,7 +2613,6 @@ DrawCompass(PLAYERp pp)
     short x;
     short i;
     int flags;
-    PANEL_SPRITEp psp;
 
     static short CompassPic[32] =
     {
@@ -2660,7 +2651,7 @@ DrawCompass(PLAYERp pp)
     if (gs.BorderNum < BORDER_BAR || pp - Player != screenpeek)
         return;
 
-    ang = pp->pang;
+    ang = fix16_to_int(pp->q16ang);
 
     if (pp->sop_remote)
         ang = 0;
@@ -2697,12 +2688,8 @@ void ScreenTileUnLock(void)
 }
 
 int
-ScreenLoadSaveSetup(PLAYERp pp)
+ScreenLoadSaveSetup(void)
 {
-    int tx, ty, tz,thoriz,pp_siz;
-    short tang,tsectnum;
-    short i;
-
     // lock and allocate memory
 
     ScreenTileLock();
@@ -2717,11 +2704,9 @@ ScreenLoadSaveSetup(PLAYERp pp)
 }
 
 int
-ScreenSaveSetup(PLAYERp pp)
+ScreenSaveSetup(void)
 {
-    short i;
-
-    ScreenLoadSaveSetup(Player + myconnectindex);
+    ScreenLoadSaveSetup();
 
     renderSetTarget(SAVE_SCREEN_TILE, SAVE_SCREEN_YSIZE, SAVE_SCREEN_XSIZE);
 

@@ -322,6 +322,7 @@ void PrecacheThing(spritetype *pSprite) {
 
 void PreloadTiles(void)
 {
+    nPrecacheCount = 0;
     int skyTile = -1;
     memset(gotpic,0,sizeof(gotpic));
     // Fonts
@@ -559,6 +560,14 @@ void G_RefreshLights(void)
         while (statNum < MAXSTATUS);
     }
 }
+
+void G_Polymer_UnInit(void)
+{
+    int32_t i;
+
+    for (i = 0; i < kMaxSprites; i++)
+        DeleteLight(i);
+}
 #endif // POLYMER
 
 
@@ -586,7 +595,7 @@ void StartLevel(GAMEOPTIONS *gameOptions)
         if (gEpisodeInfo[gGameOptions.nEpisode].cutALevel == gGameOptions.nLevel
             && gEpisodeInfo[gGameOptions.nEpisode].cutsceneASmkPath)
             gGameOptions.uGameFlags |= 4;
-        if ((gGameOptions.uGameFlags&4) && gDemo.at1 == 0)
+        if ((gGameOptions.uGameFlags&4) && gDemo.at1 == 0 && !Bstrlen(gGameOptions.szUserMap))
             levelPlayIntroScene(gGameOptions.nEpisode);
 
         ///////
@@ -626,7 +635,7 @@ void StartLevel(GAMEOPTIONS *gameOptions)
         }
     }
     bVanilla = gDemo.at1 && gDemo.m_bLegacy;
-    enginecompatibility_mode = ENGINECOMPATIBILITY_19960925;//bVanilla;
+    enginecompatibilitymode = ENGINE_19960925;//bVanilla;
     memset(xsprite,0,sizeof(xsprite));
     memset(sprite,0,kMaxSprites*sizeof(spritetype));
     drawLoadingScreen();
@@ -1612,6 +1621,23 @@ int app_main(int argc, char const * const * argv)
     OSD_SetParameters(0, 0, 0, 12, 2, 12, OSD_ERROR, OSDTEXT_RED, gamefunctions[gamefunc_Show_Console][0] == '\0' ? OSD_PROTECTED : 0);
     registerosdcommands();
 
+    char *const setupFileName = Xstrdup(SetupFilename);
+    char *const p = strtok(setupFileName, ".");
+
+    if (!p || !Bstrcmp(SetupFilename, SETUPFILENAME))
+        Bsprintf(buffer, "settings.cfg");
+    else
+        Bsprintf(buffer, "%s_settings.cfg", p);
+
+    Bfree(setupFileName);
+
+    OSD_Exec(buffer);
+
+    // Not neccessary ?
+    // CONFIG_SetDefaultKeys(keydefaults, true);
+
+    system_getcvars();
+
 #ifdef USE_QHEAP
     Resource::heap = new QHeap(nMaxAlloc);
 #endif
@@ -1692,23 +1718,7 @@ int app_main(int argc, char const * const * argv)
     SetupMenus();
     videoSetViewableArea(0, 0, xdim - 1, ydim - 1);
 
-    char *const setupFileName = Xstrdup(SetupFilename);
-    char *const p = strtok(setupFileName, ".");
-
-    if (!p || !Bstrcmp(SetupFilename, SETUPFILENAME))
-        Bsprintf(buffer, "settings.cfg");
-    else
-        Bsprintf(buffer, "%s_settings.cfg", p);
-
-    Bfree(setupFileName);
-
-    OSD_Exec(buffer);
     OSD_Exec("autoexec.cfg");
-
-    // Not neccessary ?
-    // CONFIG_SetDefaultKeys(keydefaults, true);
-
-    system_getcvars();
 
     if (!bQuickStart)
         credLogosDos();
@@ -1789,7 +1799,7 @@ RESTART:
                     g_gameUpdateAvgTime = g_gameUpdateTime;
                 g_gameUpdateAvgTime = ((GAMEUPDATEAVGTIMENUMSAMPLES-1.f)*g_gameUpdateAvgTime+g_gameUpdateTime)/((float) GAMEUPDATEAVGTIMENUMSAMPLES);
             }
-            bDraw = viewFPSLimit() != 0;
+            bDraw = engineFPSLimit() != 0;
             if (gQuitRequest && gQuitGame)
                 videoClearScreen(0);
             else
@@ -1804,7 +1814,7 @@ RESTART:
         }
         else
         {
-            bDraw = viewFPSLimit() != 0;
+            bDraw = engineFPSLimit() != 0;
             if (bDraw)
             {
                 videoClearScreen(0);
@@ -1890,7 +1900,7 @@ RESTART:
         while (gGameMenuMgr.m_bActive)
         {
             gGameMenuMgr.Process();
-            if (viewFPSLimit())
+            if (engineFPSLimit())
             {
                 gameHandleEvents();
                 videoClearScreen(0);
@@ -2601,15 +2611,19 @@ void ScanINIFiles(void)
     nINICount = 0;
     BUILDVFS_FIND_REC *pINIList = klistpath("/", "*.ini", BUILDVFS_FIND_FILE);
     pINIChain = NULL;
-
-    if (bINIOverride || !pINIList)
-    {
-        AddINIFile(BloodIniFile, true);
-    }
-
+    bool bINIExists = false;
     for (auto pIter = pINIList; pIter; pIter = pIter->next)
     {
+        if (!Bstrncasecmp(BloodIniFile, pIter->name, BMAX_PATH))
+        {
+            bINIExists = true;
+        }
         AddINIFile(pIter->name);
+    }
+
+    if ((bINIOverride && !bINIExists) || !pINIList)
+    {
+        AddINIFile(BloodIniFile, true);
     }
     klistfree(pINIList);
     pINISelected = pINIChain;

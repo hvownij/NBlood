@@ -2149,6 +2149,8 @@ static int32_t polymost_md3draw(md3model_t *m, tspriteptr_t tspr)
 
     // Parkar: Moved up to be able to use k0 for the y-flipping code
     k0 = (float)tspr->z+spriteext[tspr->owner].position_offset.z;
+    f = ((globalorientation&8) && (sprite[tspr->owner].cstat&48)!=0) ? -4.f : 4.f;
+    k0 -= (tspr->yoffset*tspr->yrepeat)*f;
     if ((globalorientation&128) && !((globalorientation&48)==32))
         k0 += (float)(sizyrep<<1);
 
@@ -2270,7 +2272,7 @@ static int32_t polymost_md3draw(md3model_t *m, tspriteptr_t tspr)
     // PLAG: Cleaner model rotation code
     if (sext->pitch || sext->roll)
     {
-        float f = 1.f/(fxdimen * fviewingrange) * (256.f/(65536.f*128.f)) * (m0.x+m1.x);
+        float f = 1.f/((fxdimen * fviewingrange) * (256.f/(65536.f*128.f)) * (m0.x+m1.x));
         Bmemset(&a0, 0, sizeof(a0));
 
         if (sext->pivot_offset.x)

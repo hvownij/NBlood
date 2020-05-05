@@ -53,7 +53,7 @@ static uint8_t* CurFrame = NULL;
 
 bool bServedSample = false;
 palette_t moviepal[256];
-static mutex_t mutex = 0;
+static mutex_t mutex;
 
 
 int ReadFrame(FILE *fp)
@@ -164,7 +164,7 @@ int ReadFrame(FILE *fp)
     }
 }
 
-static void ServeSample(const char** ptr, uint32_t* length)
+static void ServeSample(const char** ptr, uint32_t* length, void* userdata)
 {
     mutex_lock(&mutex);
 
@@ -222,7 +222,7 @@ void PlayMovie(const char* fileName)
     if (ReadFrame(fp))
     {
         // start audio playback
-        hFx = FX_StartDemandFeedPlayback(ServeSample, 8, 1, kSampleRate, 0, gMusicVolume, gMusicVolume, gMusicVolume, FX_MUSIC_PRIORITY, fix16_one, -1);
+        hFx = FX_StartDemandFeedPlayback(ServeSample, 8, 1, kSampleRate, 0, gMusicVolume, gMusicVolume, gMusicVolume, FX_MUSIC_PRIORITY, fix16_one, -1, nullptr);
 
         while (!KB_KeyWaiting())
         {

@@ -402,6 +402,8 @@ static FORCE_INLINE int isair(int32_t i)
 #ifdef USE_GLEXT
 void voxvboalloc(voxmodel_t *vm)
 {
+    if (!r_vbos)
+        return;
     const float phack[2] = { 0, 1.f / 256.f };
     glGenBuffers(1, &vm->vbo);
     glGenBuffers(1, &vm->vboindex);
@@ -435,14 +437,14 @@ void voxvboalloc(voxmodel_t *vm)
         index[(i*2+1)*3+2] = i*4+3;
     }
     GLint prevVBO = 0;
+    glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &prevVBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vm->vboindex);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * 3 * 2 * vm->qcnt, index, GL_STATIC_DRAW);
-    glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &prevVBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, prevVBO);
     prevVBO = 0;
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &prevVBO);
     glBindBuffer(GL_ARRAY_BUFFER, vm->vbo);
     glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 5 * 4 * vm->qcnt, vertex, GL_STATIC_DRAW);
-    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &prevVBO);
     glBindBuffer(GL_ARRAY_BUFFER, prevVBO);
     Xfree(vertex);
     Xfree(index);
@@ -450,8 +452,11 @@ void voxvboalloc(voxmodel_t *vm)
 
 void voxvbofree(voxmodel_t *vm)
 {
+    if (!vm->vbo)
+        return;
     glDeleteBuffers(1, &vm->vbo);
     glDeleteBuffers(1, &vm->vboindex);
+    vm->vbo = 0;
 }
 #endif
 
@@ -669,11 +674,6 @@ skindidntfit:
 
     Xfree(shp); Xfree(zbit); Xfree(bx0);
 
-#ifdef USE_GLEXT
-    if (r_vbos)
-        voxvboalloc(gvox);
-#endif
-
     return gvox;
 }
 
@@ -887,9 +887,9 @@ static int32_t loadkv6(const char *filnam)
     voxsiz.y = B_LITTLE32(voxsiz.y);
     voxsiz.z = B_LITTLE32(voxsiz.z);
 #endif
-    kread(fil, &i, 4);       voxpiv.x = (float)B_LITTLE32(i);
-    kread(fil, &i, 4);       voxpiv.y = (float)B_LITTLE32(i);
-    kread(fil, &i, 4);       voxpiv.z = (float)B_LITTLE32(i);
+    kread(fil, &i, 4); i = B_LITTLE32(i); voxpiv.x = *(float*)&i;
+    kread(fil, &i, 4); i = B_LITTLE32(i); voxpiv.y = *(float*)&i;
+    kread(fil, &i, 4); i = B_LITTLE32(i); voxpiv.z = *(float*)&i;
 
     int32_t numvoxs;
     kread(fil, &numvoxs, 4); numvoxs = B_LITTLE32(numvoxs);
@@ -1154,7 +1154,7 @@ int32_t polymost_voxdraw(voxmodel_t *m, tspriteptr_t const tspr)
         zoff += m->piv.z;
         zoff -= m->siz.z*.5f;
     }
-    if ((globalorientation&8) && (sprite[tspr->owner].cstat&48)!=0) zoff = m->siz.z-zoff;
+    if (globalorientation&8) zoff = m->siz.z-zoff;
 
     f = (65536.f*512.f) / ((float)xdimen*viewingrange);
     g = 32.f / ((float)xdimen*gxyaspect);

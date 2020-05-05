@@ -448,7 +448,7 @@ const char *keyw[] =
     "<null>"
 };
 
-const memberlabel_t SectorLabels[]=
+memberlabel_t const SectorLabels[]=
 {
     { "wallptr", SECTOR_WALLPTR, 1, 0, 0 },
     { "wallnum", SECTOR_WALLNUM, 1, 0, 0 },
@@ -481,7 +481,7 @@ const memberlabel_t SectorLabels[]=
     { "", -1, 0, 0, 0  }     // END OF LIST
 };
 
-const memberlabel_t WallLabels[]=
+memberlabel_t const WallLabels[]=
 {
     { "x", WALL_X, 0, -BXY_MAX, BXY_MAX },
     { "y", WALL_Y, 0, -BXY_MAX, BXY_MAX },
@@ -503,7 +503,7 @@ const memberlabel_t WallLabels[]=
     { "", -1, 0, 0, 0  }     // END OF LIST
 };
 
-const memberlabel_t SpriteLabels[]=
+memberlabel_t const SpriteLabels[]=
 {
     { "x", SPRITE_X, 0, -BXY_MAX, BXY_MAX },
     { "y", SPRITE_Y, 0, -BXY_MAX, BXY_MAX },
@@ -535,7 +535,7 @@ const memberlabel_t SpriteLabels[]=
 # define PR_MAXLIGHTPRIORITY 6
 #endif
 
-const memberlabel_t LightLabels[]=
+memberlabel_t const LightLabels[]=
 {
     { "x", LIGHT_X, 0, -BXY_MAX, BXY_MAX },
     { "y", LIGHT_Y, 0, -BXY_MAX, BXY_MAX },
@@ -736,7 +736,7 @@ static int32_t C_SkipComments(void)
     return 0;
 }
 
-static inline int32_t C_GetLabelNameID(const memberlabel_t *pLabel, hashtable_t *tH, const char *psz)
+static inline int32_t C_GetLabelNameID(memberlabel_t const *pLabel, hashtable_t *tH, const char *psz)
 {
     // find the label psz in the table pLabel.
     // returns the ID for the label, or -1
@@ -3501,6 +3501,7 @@ static void C_AddDefaultDefinitions(void)
     C_AddDefinition("EVENT_PRELOADMAP", EVENT_PRELOADMAP, LABEL_EVENT);
     C_AddDefinition("EVENT_PRESAVEMAP", EVENT_PRESAVEMAP, LABEL_EVENT);
     C_AddDefinition("EVENT_PREDRAW2DSCREEN", EVENT_PREDRAW2DSCREEN, LABEL_EVENT);
+    C_AddDefinition("EVENT_GETNUMBER", EVENT_GETNUMBER, LABEL_EVENT);
 
     C_AddDefinition("CLIPMASK0", CLIPMASK0, LABEL_DEFINE);
     C_AddDefinition("CLIPMASK1", CLIPMASK1, LABEL_DEFINE);
@@ -3637,6 +3638,8 @@ static void C_AddDefaultDefinitions(void)
 
     C_AddDefinition("NO",0, LABEL_DEFINE);
     C_AddDefinition("COLOR_WHITE",31, LABEL_DEFINE);
+
+    C_AddDefinition("INT32_MIN", INT32_MIN, LABEL_DEFINE);
 }
 
 void C_CompilationInfo(void)

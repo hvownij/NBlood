@@ -80,18 +80,16 @@ void PrevCheat(PLAYERp UNUSED(pp), char *UNUSED(cheat_string))
     ExitLevel = TRUE;
 }
 
-static int32_t showallmap;
-
 void MapCheat(PLAYERp pp, char *UNUSED(cheat_string))
 {
-    showallmap ^= 1;
+    automapping ^= 1;
 
-    if (showallmap)
+    if (automapping)
         MapSetAll2D(0);
     else
         MapSetAll2D(0xFF);
 
-    sprintf(ds, "SHOWALLMAP %s", showallmap ? "ON" : "OFF");
+    sprintf(ds, "AUTOMAPPING %s", automapping ? "ON" : "OFF");
     PutStringInfo(pp, ds);
 }
 
@@ -161,12 +159,12 @@ void ClipCheat(PLAYERp pp, char *UNUSED(cheat_string))
 void WarpCheat(PLAYERp pp, char *cheat_string)
 {
     char *cp = cheat_string;
-    int episode_num;
     int level_num;
 
     cp += sizeof("swtrek")-1;
     level_num = atol(cp);
 
+    //int episode_num;
     //DSPRINTF(ds,"ep %d, lev %d",episode_num, level_num);
     //MONO_PRINT(ds);
 
@@ -247,7 +245,7 @@ void EveryCheatToggle(PLAYERp pp, char *cheat_string)
 void SaveCheat(PLAYERp pp, char *UNUSED(cheat_string))
 {
     saveboard("swsave.map", (vec3_t *)pp,
-              pp->pang, pp->cursectnum);
+              fix16_to_int(pp->q16ang), pp->cursectnum);
 }
 
 void GeorgeFunc(PLAYERp pp, char *UNUSED(cheat_string))
@@ -317,8 +315,6 @@ CHEAT_INFO ci[] =
 // !JIM! My simplified version of CheatInput which simply processes MessageInputString
 void CheatInput(void)
 {
-    static SWBOOL cur_show;
-    int ret;
     SWBOOL match = FALSE;
     unsigned int i;
 

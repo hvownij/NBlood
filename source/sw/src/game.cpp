@@ -51,6 +51,7 @@ Things required to make savegames work:
 #include "names2.h"
 #include "panel.h"
 #include "game.h"
+#include "interp.h"
 #include "tags.h"
 #include "sector.h"
 #include "sprite.h"
@@ -171,6 +172,9 @@ SWBOOL NoDemoStartup = FALSE;
 SWBOOL FirstTimeIntoGame;
 extern uint8_t RedBookSong[40];
 
+SWBOOL PedanticMode;
+SWBOOL InterpolateSectObj;
+
 SWBOOL BorderAdjust = TRUE;
 SWBOOL LocationInfo = 0;
 void drawoverheadmap(int cposx, int cposy, int czoom, short cang);
@@ -251,7 +255,7 @@ SWBOOL DebugActor = FALSE;
 SWBOOL DebugAnim = FALSE;
 SWBOOL DebugOperate = FALSE;
 SWBOOL DebugActorFreeze = FALSE;
-void LoadingLevelScreen(char *level_name);
+void LoadingLevelScreen(void);
 
 uint8_t FakeMultiNumPlayers;
 
@@ -634,7 +638,13 @@ MapSetAll2D(uint8_t fill)
 void
 MapSetup(void)
 {
+#define NO_AUTO_MAPPING FALSE
+
+#if NO_AUTO_MAPPING
     MapSetAll2D(0xFF);
+#else
+    automapping = TRUE;
+#endif
 }
 
 void
@@ -648,9 +658,6 @@ setup2dscreen(void)
 void
 TerminateGame(void)
 {
-    int i,j;
-    int oldtotalclock;
-
     DemoTerm();
 
     ErrorCorrectionQuit();
@@ -686,9 +693,8 @@ TerminateGame(void)
 void
 LoadLevel(const char *filename)
 {
-    int pos;
-
-    if (engineLoadBoard(filename, SW_SHAREWARE ? 1 : 0, (vec3_t *)&Player[0], &Player[0].pang, &Player[0].cursectnum) == -1)
+    int16_t ang;
+    if (engineLoadBoard(filename, SW_SHAREWARE ? 1 : 0, (vec3_t *)&Player[0], &ang, &Player[0].cursectnum) == -1)
     {
         TerminateGame();
 #if 1 /* defined RENDERTYPEWIN */
@@ -698,14 +704,12 @@ LoadLevel(const char *filename)
 #endif
         exit(0);
     }
+    Player[0].q16ang = fix16_from_int(ang);
 }
 
 void
 LoadImages(const char *filename)
 {
-    short ndx;
-    FILE *fin;
-
     if (artLoadFiles(filename, 32*1048576) == -1)
     {
         TerminateGame();
@@ -727,11 +731,13 @@ void LoadDemoRun(void)
     if (fin)
     {
         memset(DemoName,'\0',sizeof(DemoName));
-        for (i = 0; TRUE; i++)
+        for (i = 0; i < ARRAY_SSIZE(DemoName); i++)
         {
             if (fscanf(fin, "%s", DemoName[i]) == EOF)
                 break;
         }
+        if (i == ARRAY_SSIZE(DemoName))
+            initputs("WARNING: demos.run is too long, ignoring remaining files\n");
 
         fclose(fin);
     }
@@ -742,11 +748,13 @@ void LoadDemoRun(void)
     {
         fgets(ds, 6, fin);
         sscanf(ds,"%d",&DemoTextYstart);
-        for (i = 0; TRUE; i++)
+        for (i = 0; i < ARRAY_SSIZE(DemoText); i++)
         {
             if (fgets(DemoText[i], SIZ(DemoText[0])-1, fin) == NULL)
                 break;
         }
+        if (i == ARRAY_SSIZE(DemoText))
+            initputs("WARNING: demotxt.run is too long, trimming the text\n");
 
         fclose(fin);
     }
@@ -768,7 +776,6 @@ void DisplayDemoText(void)
 void Set_GameMode(void)
 {
     int result;
-    char ch;
 
     //DSPRINTF(ds,"ScreenMode %d, ScreenWidth %d, ScreenHeight %d", ud_setup.ScreenMode, ud_setup.ScreenWidth, ud_setup.ScreenHeight);
     //MONO_PRINT(ds);
@@ -929,9 +936,10 @@ InitGame(int32_t argc, char const * const * argv)
     // sets numplayers, connecthead, connectpoint2, myconnectindex
 
     if (!firstnet)
-        initmultiplayers(0, NULL, 0, 0, 0);
+        initsingleplayers();
     else if (initmultiplayersparms(argc - firstnet, &argv[firstnet]))
     {
+        NetBroadcastMode = (networkmode == MMULTI_MODE_P2P);
         buildputs("Waiting for players...\n");
         while (initmultiplayerscycle())
         {
@@ -1062,7 +1070,7 @@ InitGame(int32_t argc, char const * const * argv)
     InitFX();   // JBF: do it down here so we get a hold of the window handle
     InitMusic();
 
-    enginecompatibility_mode = ENGINECOMPATIBILITY_19961112; // SW 1.0: 19970212, SW 1.1-1.2: 19970522
+    enginecompatibilitymode = ENGINE_19961112; // SW 1.0: 19970212, SW 1.1-1.2: 19970522
 }
 
 
@@ -1245,9 +1253,7 @@ void InitNewGame(void)
 
 void FindLevelInfo(char *map_name, short *level)
 {
-    char *ptr;
-    char buff[16];
-    short i,j;
+    short j;
 
     for (j = 1; j <= MAX_LEVELS; j++)
     {
@@ -1292,6 +1298,7 @@ void InitLevelGlobals(void)
     AnimCnt = 0;
     left_foot = FALSE;
     screenpeek = myconnectindex;
+    numinterpolations = short_numinterpolations = 0;
 
     gNet.TimeLimitClock = gNet.TimeLimit;
 
@@ -1299,6 +1306,9 @@ void InitLevelGlobals(void)
     sumowasseen = FALSE;
     zillawasseen = FALSE;
     memset(BossSpriteNum,-1,sizeof(BossSpriteNum));
+
+    PedanticMode = (DemoPlaying || DemoRecording || DemoEdit || DemoMode);
+    InterpolateSectObj = !CommEnabled && !PedanticMode;
 }
 
 void InitLevelGlobals2(void)
@@ -1407,7 +1417,7 @@ InitLevel(void)
     if (NewGame)
         InitNewGame();
 
-    LoadingLevelScreen(LevelName);
+    LoadingLevelScreen();
     MONO_PRINT("LoadintLevelScreen");
     if (!DemoMode && !DemoInitOnce)
         DemoPlaySetup();
@@ -1788,7 +1798,6 @@ LogoLevel(void)
     if (g_noLogo)
         return;
 
-    char called;
     int fin;
     unsigned char pal[PAL_SIZE];
     UserInput uinfo = { FALSE, FALSE, dir_None };
@@ -1863,9 +1872,6 @@ LogoLevel(void)
 void
 CreditsLevel(void)
 {
-    char called;
-    int fin;
-    int i;
     int curpic;
     int handle;
     uint32_t timer = 0;
@@ -2020,7 +2026,7 @@ TenScreen(void)
     //FadeIn(0, 3);
     ResetKeys();
 
-    while (!KeyPressed());
+    while (!KeyPressed() && !quitevent) handleevents();
 
     palookup[0] = palook_bak;
 
@@ -2041,10 +2047,6 @@ TenScreen(void)
 void
 TitleLevel(void)
 {
-    char called;
-    int fin;
-    unsigned char backup_pal[256*3];
-    unsigned char pal[PAL_SIZE];
     char tempbuf[256];
     char *palook_bak = palookup[0];
     int i;
@@ -2053,12 +2055,15 @@ TitleLevel(void)
         tempbuf[i] = i;
     palookup[0] = tempbuf;
 
+//    unsigned char backup_pal[256*3];
+//    unsigned char pal[PAL_SIZE];
     //GetPaletteFromVESA(pal);
     //memcpy(backup_pal, pal, PAL_SIZE);
 
     videoClearViewableArea(0L);
     videoNextPage();
 
+//    int fin;
 //    if ((fin = kopen4load("title.pal", 0)) != -1)
 //        {
 //        kread(fin, pal, PAL_SIZE);
@@ -2156,13 +2161,72 @@ IntroAnimLevel(void)
     playanm(0);
 }
 
+SWBOOL
+wfe_Esc(void)
+{
+    int16_t w,h;
+    static SWBOOL wfe_Show = 0;
+
+    // taken from top of faketimerhandler
+    // limits checks to max of 40 times a second
+    if (totalclock >= ototalclock + synctics)
+    {
+        ototalclock += synctics;
+    }
+
+    DrawMenuLevelScreen();
+
+    if (KEY_PRESSED(KEYSC_ESC))
+    {
+        KEY_PRESSED(KEYSC_ESC) = 0;
+        wfe_Show = TRUE;
+    }
+
+    if (wfe_Show)
+    {
+        sprintf(ds,"Lo Wang is afraid!  Exit game Y/N?");
+        MNU_MeasureString(ds, &w, &h);
+        MNU_DrawString(TEXT_TEST_COL(w), 170, ds, 1, 16);
+
+        videoNextPage();
+
+        if (KEY_PRESSED(KEYSC_Y))
+        {
+            KEY_PRESSED(KEYSC_Y) = 0;
+            wfe_Show = FALSE;
+            return TRUE;
+        }
+        else if (KEY_PRESSED(KEYSC_N))
+        {
+            KEY_PRESSED(KEYSC_N) = 0;
+            wfe_Show = FALSE;
+            return FALSE;
+        }
+        else
+        {
+            return FALSE;
+        }
+    }
+
+    sprintf(ds,"Lo Wang is waiting for other players...");
+    MNU_MeasureString(ds, &w, &h);
+    MNU_DrawString(TEXT_TEST_COL(w), 170, ds, 1, 16);
+
+    sprintf(ds,"They are afraid!");
+    MNU_MeasureString(ds, &w, &h);
+    MNU_DrawString(TEXT_TEST_COL(w), 180, ds, 1, 16);
+
+    videoNextPage();
+
+    return FALSE;
+}
+
 void
 MenuLevel(void)
 {
     SWBOOL MNU_StartNetGame(void);
-    char called;
-    int fin;
     extern ClockTicks totalclocklock;
+    extern SWBOOL (*wfe_ExitCallback)(void);
     short w,h;
 
     DSPRINTF(ds,"MenuLevel...");
@@ -2185,7 +2249,9 @@ MenuLevel(void)
 
         videoNextPage();
 
+        wfe_ExitCallback = &wfe_Esc;
         waitforeverybody();
+        wfe_ExitCallback = 0;
         FirstTimeIntoGame = TRUE;
         MNU_StartNetGame();
         FirstTimeIntoGame = FALSE;
@@ -2239,7 +2305,9 @@ MenuLevel(void)
     videoNextPage();
     //FadeIn(0, 3);
 
+    wfe_ExitCallback = &wfe_Esc;
     waitforeverybody();
+    wfe_ExitCallback = 0;
 
     // don't allow BorderAdjusting in these menus
     BorderAdjust = FALSE;
@@ -2266,7 +2334,7 @@ MenuLevel(void)
         handleevents();
         OSD_DispatchQueued();
 
-        if (quitevent) QuitFlag = TRUE;
+        if (quitevent) CON_Quit();
 
         // taken from top of faketimerhandler
         // limits checks to max of 40 times a second
@@ -2282,7 +2350,6 @@ MenuLevel(void)
         {
             if (MultiPlayQuitFlag)
             {
-                short pnum;
                 uint8_t pbuf[1];
                 QuitFlag = TRUE;
                 pbuf[0] = PACKET_TYPE_MENU_LEVEL_QUIT;
@@ -2372,11 +2439,10 @@ SceneLevel(void)
 }
 
 void
-LoadingLevelScreen(char *level_name)
+LoadingLevelScreen(void)
 {
     short w,h;
     extern SWBOOL DemoMode;
-    extern char *MNU_LevelName[28];
     DrawLoadLevelScreen();
 
     if (DemoMode)
@@ -2430,21 +2496,21 @@ gStateControl(STATEp *State, int *tics)
         (*(*State)->Animator)(0);
 }
 
-int BonusPunchSound(short SpriteNum)
+int BonusPunchSound(short UNUSED(SpriteNum))
 {
     PLAYERp pp = Player + myconnectindex;
     PlaySound(DIGI_PLAYERYELL3, &pp->posx, &pp->posy, &pp->posz, v3df_none);
     return 0;
 }
 
-int BonusKickSound(short SpriteNum)
+int BonusKickSound(short UNUSED(SpriteNum))
 {
     PLAYERp pp = Player + myconnectindex;
     PlaySound(DIGI_PLAYERYELL2, &pp->posx, &pp->posy, &pp->posz, v3df_none);
     return 0;
 }
 
-int BonusGrabSound(short SpriteNum)
+int BonusGrabSound(short UNUSED(SpriteNum))
 {
     PLAYERp pp = Player + myconnectindex;
     PlaySound(DIGI_BONUS_GRAB, &pp->posx, &pp->posy, &pp->posz, v3df_none);
@@ -2452,18 +2518,13 @@ int BonusGrabSound(short SpriteNum)
 }
 
 void
-BonusScreen(PLAYERp pp)
+BonusScreen(void)
 {
     int minutes,seconds,second_tics;
-    extern SWBOOL FinishedLevel;
     extern int PlayClock;
     extern short LevelSecrets;
-    extern short TotalKillable;
     short w,h;
-    short pic,limit;
-    int zero=0;
-    int handle = 0;
-    short LI_Num;
+    short limit;
 
 
 #define BONUS_SCREEN_PIC 5120
@@ -2596,6 +2657,7 @@ BonusScreen(PLAYERp pp)
     while (!BonusDone)
     {
         handleevents();
+        getpackets();
 
         // taken from top of faketimerhandler
         if (totalclock < ototalclock + limit)
@@ -2704,7 +2766,7 @@ void EndGameSequence(void)
     if (anim_ok)
         playanm(FinishAnim);
 
-    BonusScreen(Player + myconnectindex);
+    BonusScreen();
 
     ExitLevel = FALSE;
     QuitFlag = FALSE;
@@ -2735,14 +2797,8 @@ void EndGameSequence(void)
 void
 StatScreen(PLAYERp mpp)
 {
-    int minutes,seconds,second_tics;
     extern SWBOOL FinishedLevel;
-    extern int PlayClock;
-    extern short LevelSecrets;
-    extern short TotalKillable;
     short w,h;
-    int zero=0;
-    int handle=0;
 
     short rows,cols,i,j;
     PLAYERp pp = NULL;
@@ -2778,7 +2834,7 @@ StatScreen(PLAYERp mpp)
     {
         if (!FinishedLevel)
             return;
-        BonusScreen(mpp);
+        BonusScreen();
         return;
     }
 
@@ -2816,7 +2872,7 @@ StatScreen(PLAYERp mpp)
         DisplayMiniBarSmString(mpp, x, y, 0, ds);
 
         sprintf(ds,"  %-13s", pp->PlayerName);
-        DisplayMiniBarSmString(mpp, x, y, User[pp->PlayerSprite]->spal, ds);
+        DisplayMiniBarSmString(mpp, x, y, PALETTE_PLAYER0 + pp->TeamColor, ds);
 
         x = STAT_TABLE_X;
         for (j = 0; j < cols; j++)
@@ -2832,7 +2888,7 @@ StatScreen(PLAYERp mpp)
             }
             else if (gNet.TeamPlay)
             {
-                if (User[pp->PlayerSprite]->spal == User[Player[j].PlayerSprite]->spal)
+                if (pp->TeamColor == Player[j].TeamColor)
                 {
                     // don't add kill for self or team player
                     pal = PALETTE_PLAYER0 + 4;
@@ -2892,7 +2948,7 @@ StatScreen(PLAYERp mpp)
 
     if (KeyPressed())
     {
-        while (KeyPressed()) ;
+        while (KeyPressed() && !quitevent) { handleevents(); getpackets(); }
     }
 
     KEY_PRESSED(KEYSC_SPACE) = 0;
@@ -2906,7 +2962,7 @@ StatScreen(PLAYERp mpp)
     while (!KEY_PRESSED(KEYSC_SPACE) && !KEY_PRESSED(KEYSC_ENTER))
     {
         handleevents();
-
+        getpackets();
         ScreenCaptureKeys();
     }
 
@@ -2953,6 +3009,8 @@ Control(int32_t argc, char const * const * argv)
 {
 
     InitGame(argc, argv);
+    if (QuitFlag)
+        return;
 
     MONO_PRINT("InitGame done");
     MNU_InitMenus();
@@ -3038,6 +3096,8 @@ dsprintf_null(char *str, const char *format, ...)
     va_list arglist;
 }
 
+void getinput(SW_PACKET *, SWBOOL);
+
 void MoveLoop(void)
 {
     int pnum;
@@ -3078,6 +3138,10 @@ void MoveLoop(void)
         //    demosync_record();
 #endif
     }
+
+    // Get input again to update q16ang/q16horiz.
+    if (!PedanticMode)
+        getinput(&loc, TRUE);
 
     if (!InputMode && !PauseKeySet)
         MNU_CheckForMenus();
@@ -3127,7 +3191,6 @@ void InitPlayerGameSettings(void)
 
 void InitRunLevel(void)
 {
-    int i;
     if (DemoEdit)
         return;
 
@@ -3215,7 +3278,6 @@ void InitRunLevel(void)
 void
 RunLevel(void)
 {
-    int i;
     InitRunLevel();
 
     FX_SetVolume(gs.SoundVolume);
@@ -3231,7 +3293,7 @@ RunLevel(void)
         handleevents();
         OSD_DispatchQueued();
 
-        if (quitevent) QuitFlag = TRUE;
+        if (quitevent) CON_Quit();
 
         //MONO_PRINT("Before MoveLoop");
         MoveLoop();
@@ -3444,13 +3506,10 @@ void CommandLineHelp(char const * const * argv)
 int32_t app_main(int32_t argc, char const * const * argv)
 {
     int i;
-    int stat, nexti;
-    char type;
     extern int MovesPerPacket;
     void DoSector(void);
     void gameinput(void);
     int cnt = 0;
-    uint32_t TotalMemory;
 
     for (i=1; i<argc; i++)
     {
@@ -3675,37 +3734,6 @@ int32_t app_main(int32_t argc, char const * const * argv)
 
         if (*arg != '/' && *arg != '-') continue;
 
-        if (firstnet > 0)
-        {
-            arg++;
-            switch (arg[0])
-            {
-            case 'n':
-            case 'N':
-                if (arg[1] == '0')
-                {
-                    NetBroadcastMode = FALSE;
-                    buildputs("Network mode: master/slave\n");
-                    wm_msgbox("Multiplayer Option Error",
-                              "This release unfortunately does not support a master-slave networking "
-                              "mode because of certain bugs we have not been able to locate and fix "
-                              "at this time. However, peer-to-peer networking has been found to be "
-                              "playable, so we suggest attempting to use that for now. Details can be "
-                              "found in the release notes. Sorry for the inconvenience.");
-                    return 0;
-                }
-                else if (arg[1] == '1')
-                {
-                    NetBroadcastMode = TRUE;
-                    buildputs("Network mode: peer-to-peer\n");
-                }
-                break;
-            default:
-                break;
-            }
-            continue;
-        }
-
         // Store arg in command line array!
         CON_StoreArg(arg);
         arg++;
@@ -3746,10 +3774,8 @@ int32_t app_main(int32_t argc, char const * const * argv)
         }
         else if (Bstrncasecmp(arg, "net",3) == 0)
         {
-            if (cnt+1 < argc)
-            {
-                firstnet = cnt+1;
-            }
+            firstnet = cnt+1;
+            break; // All further args go to mmulti.
         }
 #if DEBUG
         else if (Bstrncasecmp(arg, "debug",5) == 0)
@@ -4112,7 +4138,6 @@ void
 ManualPlayerInsert(PLAYERp pp)
 {
     PLAYERp npp = Player + numplayers;
-    int i;
 
     if (numplayers < MAX_SW_PLAYERS)
     {
@@ -4122,7 +4147,7 @@ ManualPlayerInsert(PLAYERp pp)
         npp->posx = pp->posx;
         npp->posy = pp->posy;
         npp->posz = pp->posz;
-        npp->pang = pp->pang;
+        npp->q16ang = pp->q16ang;
         npp->cursectnum = pp->cursectnum;
 
         myconnectindex = numplayers;
@@ -4144,7 +4169,6 @@ void
 BotPlayerInsert(PLAYERp pp)
 {
     PLAYERp npp = Player + numplayers;
-    int i;
 
     if (numplayers < MAX_SW_PLAYERS)
     {
@@ -4154,7 +4178,7 @@ BotPlayerInsert(PLAYERp pp)
         npp->posx = pp->posx;
         npp->posy = pp->posy;
         npp->posz = pp->posz-Z(100);
-        npp->pang = pp->pang;
+        npp->q16ang = pp->q16ang;
         npp->cursectnum = pp->cursectnum;
 
         //myconnectindex = numplayers;
@@ -4174,11 +4198,10 @@ BotPlayerInsert(PLAYERp pp)
 }
 
 void
-ManualPlayerDelete(PLAYERp cur_pp)
+ManualPlayerDelete(void)
 {
     short i, nexti;
     USERp u;
-    short save_myconnectindex;
     PLAYERp pp;
 
     if (numplayers > 1)
@@ -4304,7 +4327,7 @@ SinglePlayInput(PLAYERp pp)
     if (KEY_PRESSED(KEYSC_DEL))
     {
         KEY_PRESSED(KEYSC_DEL) = 0;
-        ManualPlayerDelete(pp);
+        ManualPlayerDelete();
     }
 
     // Move control to numbered player
@@ -4505,7 +4528,6 @@ SWBOOL DoQuickLoad()
 void
 FunctionKeys(PLAYERp pp)
 {
-    extern SWBOOL GamePaused;
     static int rts_delay = 0;
     int fn_key = 0;
 
@@ -4534,7 +4556,6 @@ FunctionKeys(PLAYERp pp)
 
             if (CommEnabled)
             {
-                short pnum;
                 PACKET_RTS p;
 
                 p.PacketType = PACKET_TYPE_RTS;
@@ -4723,7 +4744,6 @@ FunctionKeys(PLAYERp pp)
 void PauseKey(PLAYERp pp)
 {
     extern SWBOOL GamePaused,CheatInputMode;
-    extern SWBOOL enabled;
 
     if (KEY_PRESSED(sc_Pause) && !CommEnabled && !InputMode && !UsingMenus && !CheatInputMode && !ConPanel)
     {
@@ -4773,11 +4793,9 @@ void PauseKey(PLAYERp pp)
 void GetMessageInput(PLAYERp pp)
 {
     int pnum = myconnectindex;
-    short w,h;
     signed char MNU_InputSmallString(char *, short);
     signed char MNU_InputString(char *, short);
-    static SWBOOL cur_show;
-    static SWBOOL TeamSendAll, TeamSendTeam;
+    static SWBOOL TeamSendAll;
 #define TEAM_MENU "A - Send to ALL,  T - Send to TEAM"
     static char HoldMessageInputString[256];
     int i;
@@ -4791,7 +4809,6 @@ void GetMessageInput(PLAYERp pp)
             KB_FlushKeyboardQueue();
             MessageInputMode = TRUE;
             InputMode = TRUE;
-            TeamSendTeam = FALSE;
             TeamSendAll = FALSE;
 
             if (MessageInputMode)
@@ -4905,7 +4922,6 @@ SEND_MESSAGE:
                 else if (memcmp(MessageInputString, TEAM_MENU "t", sizeof(TEAM_MENU)+1) == 0)
                 {
                     strcpy(MessageInputString, HoldMessageInputString);
-                    TeamSendTeam = TRUE;
                     goto SEND_MESSAGE;
                 }
                 else
@@ -4923,13 +4939,10 @@ SEND_MESSAGE:
     }
 }
 
-void GetConInput(PLAYERp pp)
+void GetConInput(void)
 {
-    int pnum = myconnectindex;
-    short w,h;
     signed char MNU_InputSmallString(char *, short);
     signed char MNU_InputString(char *, short);
-    static SWBOOL cur_show;
 
     if (MessageInputMode || HelpInputMode)
         return;
@@ -5061,14 +5074,15 @@ void GetHelpInput(PLAYERp pp)
 
 short MirrorDelay;
 
+double elapsedInputTicks;
+double scaleAdjustmentToInterval(double x) { return x * (120 / synctics) / (1000.0 / elapsedInputTicks); }
+
 void
-getinput(SW_PACKET *loc)
+getinput(SW_PACKET *loc, SWBOOL tied)
 {
-    SWBOOL found = FALSE;
     int i;
     PLAYERp pp = Player + myconnectindex;
     PLAYERp newpp = Player + myconnectindex;
-    int pnum = myconnectindex;
     int inv_hotkey = 0;
 
 #define TURBOTURNTIME (120/8)
@@ -5079,7 +5093,7 @@ getinput(SW_PACKET *loc)
 #define MAXVEL       ((NORMALKEYMOVE*2)+10)
 #define MAXSVEL      ((NORMALKEYMOVE*2)+10)
 #define MAXANGVEL    100
-#define MAXAIMVEL    128
+#define MAXHORIZVEL  128
 #define SET_LOC_KEY(loc, sync_num, key_test) SET(loc, ((!!(key_test)) << (sync_num)))
 
     static int32_t turnheldtime;
@@ -5093,8 +5107,12 @@ getinput(SW_PACKET *loc)
         newpp = ppp;
     }
 
-    // reset all syncbits
-    loc->bits = 0;
+    static double lastInputTicks;
+
+    auto const currentHiTicks = timerGetHiTicks();
+    elapsedInputTicks = currentHiTicks - lastInputTicks;
+
+    lastInputTicks = currentHiTicks;
 
     // MAKE SURE THIS WILL GET SET
     SET_LOC_KEY(loc->bits, SK_QUIT_GAME, MultiPlayQuitFlag);
@@ -5147,7 +5165,7 @@ getinput(SW_PACKET *loc)
     if (!MenuInputMode && !UsingMenus)
     {
         GetMessageInput(pp);
-        GetConInput(pp);
+        GetConInput();
         GetHelpInput(pp);
     }
 
@@ -5188,7 +5206,7 @@ getinput(SW_PACKET *loc)
     // If in 2D follow mode, scroll around using glob vars
     // Tried calling this in domovethings, but key response it too poor, skips key presses
     // Note: ScrollMode2D = Follow mode, so this get called only during follow mode
-    if (ScrollMode2D && pp == Player + myconnectindex && !Prediction)
+    if (!tied && ScrollMode2D && pp == Player + myconnectindex && !Prediction)
         MoveScrollMode2D(Player + myconnectindex);
 
     // !JIM! Added UsingMenus so that you don't move at all while using menus
@@ -5221,10 +5239,14 @@ getinput(SW_PACKET *loc)
         keymove = NORMALKEYMOVE;
     }
 
+    if (tied)
+        keymove = 0;
+
     info.dz = (info.dz * move_scale)>>8;
     info.dyaw = (info.dyaw * turn_scale)>>8;
 
-    int32_t svel = 0, vel = 0, angvel = 0, aimvel = 0;
+    int32_t svel = 0, vel = 0;
+    fix16_t q16aimvel = 0, q16angvel = 0;
 
     if (BUTTON(gamefunc_Strafe) && !pp->sop)
     {
@@ -5233,19 +5255,19 @@ getinput(SW_PACKET *loc)
     }
     else
     {
-        angvel = info.mousex / 32;
-        angvel += info.dyaw * (turnamount << 1) / analogExtent;
+        q16angvel = fix16_div(fix16_from_int(info.mousex), fix16_from_int(32));
+        q16angvel += fix16_from_int(info.dyaw) / analogExtent * (turnamount << 1);
     }
 
     if (aimMode)
-        aimvel = -info.mousey / 64;
+        q16aimvel = -fix16_div(fix16_from_int(info.mousey), fix16_from_int(64));
     else
         vel = -(info.mousey >> 6);
 
     if (gs.MouseInvert)
-        aimvel = -aimvel;
+        q16aimvel = -q16aimvel;
 
-    aimvel -= info.dpitch * turnamount / analogExtent;
+    q16aimvel -= fix16_from_int(info.dpitch) * turnamount / analogExtent;
     svel -= info.dx * keymove / analogExtent;
     vel -= info.dz * keymove / analogExtent;
 
@@ -5261,18 +5283,28 @@ getinput(SW_PACKET *loc)
         if (BUTTON(gamefunc_Turn_Left))
         {
             turnheldtime += synctics;
-            if (turnheldtime >= TURBOTURNTIME)
-                angvel -= turnamount;
+            if (PedanticMode)
+            {
+                if (turnheldtime >= TURBOTURNTIME)
+                    q16angvel -= fix16_from_int(turnamount);
+                else
+                    q16angvel -= fix16_from_int(PREAMBLETURN);
+            }
             else
-                angvel -= PREAMBLETURN;
+                q16angvel = fix16_ssub(q16angvel, fix16_from_float(scaleAdjustmentToInterval((turnheldtime >= TURBOTURNTIME) ? turnamount : PREAMBLETURN)));
         }
         else if (BUTTON(gamefunc_Turn_Right))
         {
             turnheldtime += synctics;
-            if (turnheldtime >= TURBOTURNTIME)
-                angvel += turnamount;
+            if (PedanticMode)
+            {
+                if (turnheldtime >= TURBOTURNTIME)
+                    q16angvel += fix16_from_int(turnamount);
+                else
+                    q16angvel += fix16_from_int(PREAMBLETURN);
+            }
             else
-                angvel += PREAMBLETURN;
+                q16angvel = fix16_sadd(q16angvel, fix16_from_float(scaleAdjustmentToInterval((turnheldtime >= TURBOTURNTIME) ? turnamount : PREAMBLETURN)));
         }
         else
         {
@@ -5301,22 +5333,43 @@ getinput(SW_PACKET *loc)
     if (BUTTON(gamefunc_Move_Backward))
         vel += -keymove;
 
-    vel = clamp(vel, -MAXVEL, MAXVEL);
-    svel = clamp(svel, -MAXSVEL, MAXSVEL);
+    q16angvel = fix16_clamp(q16angvel, -fix16_from_int(MAXANGVEL), fix16_from_int(MAXANGVEL));
+    q16aimvel = fix16_clamp(q16aimvel, -fix16_from_int(MAXHORIZVEL), fix16_from_int(MAXHORIZVEL));
 
-    angvel = clamp(angvel, -MAXANGVEL, MAXANGVEL);
-    aimvel = clamp(aimvel, -MAXAIMVEL, MAXAIMVEL);
+    if (PedanticMode)
+    {
+        q16angvel = fix16_floor(q16angvel);
+        q16aimvel = fix16_floor(q16aimvel);
+    }
+    else if (!TEST(pp->Flags, PF_DEAD))
+    {
+        void DoPlayerTurn(PLAYERp pp, fix16_t *pq16ang, fix16_t q16angvel);
+        void DoPlayerHorizon(PLAYERp pp, fix16_t *pq16horiz, fix16_t q16aimvel);
+        if (!TEST(pp->Flags, PF_CLIMBING))
+            DoPlayerTurn(pp, &pp->camq16ang, q16angvel);
+        DoPlayerHorizon(pp, &pp->camq16horiz, q16aimvel);
+    }
 
-    momx = mulscale9(vel, sintable[NORM_ANGLE(newpp->pang + 512)]);
-    momy = mulscale9(vel, sintable[NORM_ANGLE(newpp->pang)]);
+    loc->vel += vel;
+    loc->svel += svel;
 
-    momx += mulscale9(svel, sintable[NORM_ANGLE(newpp->pang)]);
-    momy += mulscale9(svel, sintable[NORM_ANGLE(newpp->pang + 1536)]);
+    if (!tied)
+    {
+        vel = clamp(loc->vel, -MAXVEL, MAXVEL);
+        svel = clamp(loc->svel, -MAXSVEL, MAXSVEL);
 
-    loc->vel = momx;
-    loc->svel = momy;
-    loc->angvel = angvel;
-    loc->aimvel = aimvel;
+        momx = mulscale9(vel, sintable[NORM_ANGLE(fix16_to_int(newpp->q16ang) + 512)]);
+        momy = mulscale9(vel, sintable[NORM_ANGLE(fix16_to_int(newpp->q16ang))]);
+
+        momx += mulscale9(svel, sintable[NORM_ANGLE(fix16_to_int(newpp->q16ang))]);
+        momy += mulscale9(svel, sintable[NORM_ANGLE(fix16_to_int(newpp->q16ang) + 1536)]);
+
+        loc->vel = momx;
+        loc->svel = momy;
+    }
+
+    loc->q16angvel += q16angvel;
+    loc->q16aimvel += q16aimvel;
 
     if (MenuButtonAutoRun)
     {
@@ -5528,7 +5581,7 @@ getinput(SW_PACKET *loc)
     if (BUTTON(gamefunc_Toggle_Crosshair))
     {
         CONTROL_ClearButton(gamefunc_Toggle_Crosshair);
-        pToggleCrosshair(pp);
+        pToggleCrosshair();
     }
 }
 
@@ -5573,7 +5626,7 @@ void drawoverheadmap(int cposx, int cposy, int czoom, short cang)
 
     if (ScrollMode2D)
     {
-        minigametext(txt_x,txt_y-7,"Follow Mode",0,2+8);
+        minigametext(txt_x,txt_y-7,"Follow Mode",2+8);
     }
 
     if (UserMapName[0])
@@ -5581,7 +5634,7 @@ void drawoverheadmap(int cposx, int cposy, int czoom, short cang)
     else
         sprintf(ds,"%s",LevelInfo[Level].Description);
 
-    minigametext(txt_x,txt_y,ds,0,2+8);
+    minigametext(txt_x,txt_y,ds,2+8);
 
     //////////////////////////////////
 

@@ -54,7 +54,7 @@ int MultiClipMove(PLAYERp pp, int z, int floor_dist)
 
     for (i = 0; i < sop->clipbox_num; i++)
     {
-        ang = NORM_ANGLE(pp->pang + sop->clipbox_ang[i]);
+        ang = NORM_ANGLE(fix16_to_int(pp->q16ang) + sop->clipbox_ang[i]);
         ox[i] = x[i] = pp->posx + (sop->clipbox_vdist[i] * sintable[NORM_ANGLE(ang + 512)] >> 14);
         oy[i] = y[i] = pp->posy + (sop->clipbox_vdist[i] * sintable[ang] >> 14);
 
@@ -98,7 +98,7 @@ int MultiClipMove(PLAYERp pp, int z, int floor_dist)
 
     for (i = 0; i < sop->clipbox_num; i++)
     {
-        ang = NORM_ANGLE(pp->pang + sop->clipbox_ang[i]);
+        ang = NORM_ANGLE(fix16_to_int(pp->q16ang) + sop->clipbox_ang[i]);
         ox[i] = x[i] = pp->posx + (sop->clipbox_vdist[i] * sintable[NORM_ANGLE(ang + 512)] >> 14);
         oy[i] = y[i] = pp->posy + (sop->clipbox_vdist[i] * sintable[ang] >> 14);
 
@@ -149,7 +149,7 @@ int MultiClipMove(PLAYERp pp, int z, int floor_dist)
     {
         // move the box to position instead of using offset- this prevents small rounding errors
         // allowing you to move through wall
-        ang = NORM_ANGLE(pp->pang + sop->clipbox_ang[i]);
+        ang = NORM_ANGLE(fix16_to_int(pp->q16ang) + sop->clipbox_ang[i]);
 
         xs = pp->posx;
         ys = pp->posy;
@@ -215,7 +215,7 @@ int MultiClipMove(PLAYERp pp, int z, int floor_dist)
     {
         // move the box to position instead of using offset- this prevents small rounding errors
         // allowing you to move through wall
-        ang = NORM_ANGLE(pp->pang + sop->clipbox_ang[i]);
+        ang = NORM_ANGLE(fix16_to_int(pp->q16ang) + sop->clipbox_ang[i]);
 
         xs = pp->posx;
         ys = pp->posy;
@@ -278,8 +278,6 @@ int MultiClipMove(PLAYERp pp, int z, int floor_dist)
 {
     int i;
     int ox[MAX_CLIPBOX],oy[MAX_CLIPBOX];
-    SPRITEp sp = pp->sop->sp_child;
-    USERp u = User[sp - sprite];
     SECTOR_OBJECTp sop = pp->sop;
     short ang;
     short min_ndx = 0;
@@ -298,7 +296,7 @@ int MultiClipMove(PLAYERp pp, int z, int floor_dist)
     {
         // move the box to position instead of using offset- this prevents small rounding errors
         // allowing you to move through wall
-        ang = NORM_ANGLE(pp->pang + sop->clipbox_ang[i]);
+        ang = NORM_ANGLE(fix16_to_int(pp->q16ang) + sop->clipbox_ang[i]);
 
         xs = pp->posx;
         ys = pp->posy;
@@ -442,13 +440,8 @@ int testquadinsect(int *point_num, vec2_t const * q, short sectnum)
 //Ken gives the tank clippin' a try...
 int RectClipMove(PLAYERp pp, int *qx, int *qy)
 {
-    SECTORp *sectp;
-    SECTOR_OBJECTp sop = pp->sop;
-    WALLp wp;
-    int count=0;
     int i;
     vec2_t xy[4];
-    short startwall,endwall;
     int point_num;
 
     for (i = 0; i < 4; i++)
@@ -529,8 +522,6 @@ short RectClipTurn(PLAYERp pp, short new_ang, int *qx, int *qy, int *ox, int *oy
     int i;
     vec2_t xy[4];
     SECTOR_OBJECTp sop = pp->sop;
-    int ret;
-    short ang;
     short rot_ang;
     int point_num;
 

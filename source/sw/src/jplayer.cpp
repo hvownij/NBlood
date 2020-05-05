@@ -122,7 +122,7 @@ int gametext(int x,int y,char *t,char s,short dabits)
     return x;
 }
 
-int minigametext(int x,int y,const char *t,char s,short dabits)
+int minigametext(int x,int y,const char *t,short dabits)
 {
     short ac,newx;
     char centre;
@@ -253,16 +253,16 @@ void operatefta(void)
         {
             // dont fade out
             if (k > 4)
-                minigametext(320>>1,j,user_quote[i],0,2+8);
+                minigametext(320>>1,j,user_quote[i],2+8);
             else if (k > 2)
-                minigametext(320>>1,j,user_quote[i],0,2+8+1);
+                minigametext(320>>1,j,user_quote[i],2+8+1);
             else
-                minigametext(320>>1,j,user_quote[i],0,2+8+1+32);
+                minigametext(320>>1,j,user_quote[i],2+8+1+32);
         }
         else
         {
             // dont fade out
-            minigametext(320>>1,j,user_quote[i],0,2+8);
+            minigametext(320>>1,j,user_quote[i],2+8);
         }
 
         j -= 6;
@@ -287,7 +287,7 @@ void addconquote(char *daquote)
 #define CON_ROT_FLAGS (ROTATE_SPRITE_CORNER|ROTATE_SPRITE_SCREEN_CLIP|ROTATE_SPRITE_NON_MASK)
 void operateconfta(void)
 {
-    int i, j, k;
+    int i, j;
 
     if (!ConPanel) return; // If panel isn't up, don't draw anything
 
@@ -344,7 +344,7 @@ void BOT_ChooseWeapon(PLAYERp p, USERp u, SW_PACKET *syn)
         }
 }
 
-int getspritescore(int snum, int dapicnum)
+int getspritescore(/*int snum, */int dapicnum)
 {
 
     switch (dapicnum)
@@ -424,7 +424,6 @@ void computergetinput(int snum, SW_PACKET *syn)
     walltype *wal;
     int myx, myy, myz, myang, mycursectnum;
     USERp u;
-    short weap;
     //extern SWBOOL Pachinko_Win_Cheat;
 
     if (!MoveSkip4) return; // Make it so the bots don't slow the game down so bad!
@@ -440,21 +439,21 @@ void computergetinput(int snum, SW_PACKET *syn)
     myx = p->posx;
     myy = p->posy;
     myz = p->posz;
-    myang = p->pang;
+    myang = fix16_to_int(p->q16ang);
     mycursectnum = p->cursectnum;
 
     // Reset input bits
     syn->vel = 0;
     syn->svel = 0;
-    syn->angvel = 0;
-    syn->aimvel = 0;
+    syn->q16angvel = 0;
+    syn->q16aimvel = 0;
     syn->bits = 0;
 
     x1 = p->posx;
     y1 = p->posy;
     z1 = p->posz;
 
-    damyang = p->pang;
+    damyang = fix16_to_int(p->q16ang);
     damysect = sprite[p->PlayerSprite].sectnum;
     if ((numplayers >= 2) && (snum == myconnectindex))
     { x1 = myx; y1 = myy; z1 = myz+PLAYER_HEIGHT; damyang = myang; damysect = mycursectnum; }
@@ -599,7 +598,7 @@ void computergetinput(int snum, SW_PACKET *syn)
         {
             vec3_t hit_pos = { x1, y1, z1-PLAYER_HEIGHT };
             hitscan(&hit_pos,damysect,sintable[(damyang+512)&2047],sintable[damyang&2047],
-                    (100-p->horiz-p->horizoff)*32,&hitinfo,CLIPMASK1);
+                    (100-fix16_to_int(p->q16horiz)-fix16_to_int(p->q16horizoff))*32,&hitinfo,CLIPMASK1);
             if ((hitinfo.pos.x-x1)*(hitinfo.pos.x-x1)+(hitinfo.pos.y-y1)*(hitinfo.pos.y-y1) < 2560*2560) syn->bits &= ~(1<<SK_SHOOT);
         }
 
@@ -651,9 +650,9 @@ void computergetinput(int snum, SW_PACKET *syn)
             daang = NORM_ANGLE((daang-64) + STD_RANDOM_RANGE(128));
 
         // Below formula fails in certain cases
-        //syn->angvel = min(max((((daang+1024-damyang)&2047)-1024)>>1,-MAXANGVEL),MAXANGVEL); //was 127
-        p->pang = daang;
-        syn->aimvel = min(max((zang-p->horiz)>>1,-PLAYER_HORIZ_MAX),PLAYER_HORIZ_MAX);
+        //syn->q16angvel = fix16_from_int(min(max((((daang+1024-damyang)&2047)-1024)>>1,-MAXANGVEL),MAXANGVEL)); //was 127
+        p->q16ang = fix16_from_int(daang);
+        syn->q16aimvel = fix16_from_int(min(max((zang-fix16_to_int(p->q16horiz))>>1,-PLAYER_HORIZ_MAX),PLAYER_HORIZ_MAX));
         // Sets type of aiming, auto aim for bots
         syn->bits |= (1<<SK_AUTO_AIM);
         return;
@@ -797,7 +796,7 @@ void computergetinput(int snum, SW_PACKET *syn)
                 for (j=headspritesect[i]; j>=0; j=nextspritesect[j])
                 {
                     if ((sprite[j].xrepeat <= 0) || (sprite[j].yrepeat <= 0)) continue;
-                    if (getspritescore(snum,sprite[j].picnum) <= 0) continue;
+                    if (getspritescore(/*snum,*/sprite[j].picnum) <= 0) continue;
                     if (FAFcansee(x1,y1,z1-(32<<8),damysect,sprite[j].x,sprite[j].y,sprite[j].z-(4<<8),i))
                     { goalx[snum] = sprite[j].x; goaly[snum] = sprite[j].y; goalz[snum] = sprite[j].z; goalsprite[snum] = j; break; }
                 }
@@ -809,7 +808,7 @@ void computergetinput(int snum, SW_PACKET *syn)
         daang = getangle(x2-x1,y2-y1);
         syn->vel += (x2-x1)*2047/dist;
         syn->svel += (y2-y1)*2047/dist;
-        syn->angvel = min(max((((daang+1024-damyang)&2047)-1024)>>3,-MAXANGVEL),MAXANGVEL);
+        syn->q16angvel = fix16_from_int(min(max((((daang+1024-damyang)&2047)-1024)>>3,-MAXANGVEL),MAXANGVEL));
     }
     else
         goalsprite[snum] = -1;
@@ -872,7 +871,7 @@ void computergetinput(int snum, SW_PACKET *syn)
             daang = ((getangle(wall[wall[goalwall[snum]].point2].x-wall[goalwall[snum]].x,wall[wall[goalwall[snum]].point2].y-wall[goalwall[snum]].y)+1536)&2047);
         syn->vel += (x2-x1)*2047/dist;
         syn->svel += (y2-y1)*2047/dist;
-        syn->angvel = min(max((((daang+1024-damyang)&2047)-1024)>>3,-MAXANGVEL),MAXANGVEL);
+        syn->q16angvel = fix16_from_int(min(max((((daang+1024-damyang)&2047)-1024)>>3,-MAXANGVEL),MAXANGVEL));
     }
 
 
@@ -893,7 +892,7 @@ void computergetinput(int snum, SW_PACKET *syn)
                 daang = ((getangle(wall[wall[goalwall[snum]].point2].x-wall[goalwall[snum]].x,wall[wall[goalwall[snum]].point2].y-wall[goalwall[snum]].y)+1536)&2047);
             syn->vel += (x2-x1)*2047/dist;
             syn->svel += (y2-y1)*2047/dist;
-            syn->angvel = min(max((((daang+1024-damyang)&2047)-1024)>>3,-MAXANGVEL),MAXANGVEL);
+            syn->q16angvel = fix16_from_int(min(max((((daang+1024-damyang)&2047)-1024)>>3,-MAXANGVEL),MAXANGVEL));
         }
     */
 }
